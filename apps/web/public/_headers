@@ -1,0 +1,21 @@
+# Vite fingerprints every asset filename with a content hash, so a given URL
+# can never change contents. Cache them hard.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# index.html must NOT be cached. Its filename never changes but its contents do
+# on every deploy, since it carries the script tags pointing at the new hashed
+# bundles. Without this you eventually stand in the gym looking at a projector
+# running yesterday's build and wondering why the fix is not live.
+/index.html
+  Cache-Control: no-cache
+
+/
+  Cache-Control: no-cache
+
+# Baseline security headers. The board is a public URL, so these are cheap and
+# worth having from the start.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY

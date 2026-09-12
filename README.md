@@ -42,7 +42,45 @@ nullable integer, and a session with none recorded is still valid.
 
 Requires the .NET 10 SDK, Node 22 or later, and Docker Desktop.
 
-Setup instructions will be added along with the scaffold.
+```sh
+# 1. Database
+docker compose up -d
+
+# 2. API, in its own terminal
+dotnet run --project apps/api/src/Awana.Api
+
+# 3. Web app, in another terminal
+npm install --prefix apps/web
+npm run dev --prefix apps/web
+```
+
+Then open http://localhost:5200.
+
+| Service | Port |
+|---|---|
+| Web app | 5200 |
+| API | 5201 |
+| Postgres | 5433 |
+
+Postgres is on 5433 rather than the default 5432 so it can run alongside
+another project's database.
+
+Both the web app and the API run over plain HTTP locally, and that is
+deliberate. Browsers treat HTTP and HTTPS as different sites, so serving one
+over HTTPS would make the auth cookie cross-site and break sign-in in a way
+that looks like an authentication bug rather than a scheme mismatch.
+
+`apps/web/.env.development` is committed because it holds no secrets and the
+dev server does not start without it. For personal overrides create
+`apps/web/.env.development.local`, which is ignored.
+
+### Tests
+
+```sh
+dotnet test apps/api/Awana.slnx
+npm run lint --prefix apps/web
+npm run build --prefix apps/web
+```
 
 ## License
 

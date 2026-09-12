@@ -1,0 +1,8 @@
+# Keep the build context small and, more importantly, stop host build output
+# from overwriting what the container just compiled.
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/appsettings.*.local.json
+**/.env

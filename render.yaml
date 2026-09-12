@@ -1,0 +1,71 @@
+# Render blueprint for the API. The frontend is on Cloudflare Pages and is not
+# described here.
+
+services:
+  - type: web
+    name: awana-api
+    runtime: docker
+    region: oregon          # Closest region to Seattle.
+    plan: starter           # $7/mo. The free plan spins down after inactivity,
+                            # which would mean a cold start at 7:15pm on a
+                            # Friday with a room full of kids waiting.
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
+
+    # Render polls this to decide whether a deploy succeeded and whether the
+    # instance is healthy. It returns a static payload and never touches the
+    # database, so a slow query cannot turn into a restart loop.
+    healthCheckPath: /api/health
+
+    # MUST stay 1.
+    #
+    # SignalR keeps connection and group state in the memory of the instance
+    # that holds the socket. With two instances, a scoreboard connected to
+    # instance A never receives a broadcast triggered by a request that landed
+    # on instance B, and the board silently stops updating with no error
+    # anywhere. Scaling past one requires a Redis backplane first.
+    numInstances: 1
+
+    autoDeploy: true
+
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # Neon POOLED connection string, used by the app at runtime.
+      # Must include Max Auto Prepare=0: Neon fronts Postgres with PgBouncer in
+      # transaction mode, which is incompatible with Npgsql's automatic
+      # prepared statements, and the failure is intermittent and confusing.
+      - key: ConnectionStrings__Default
+        sync: false
+
+      # Neon DIRECT connection string, used only for migrations. DDL must not
+      # run through the pooler.
+      - key: ConnectionStrings__Migrations
+        sync: false
+
+      # Lets migrations be turned off from the dashboard without a redeploy
+      # when something goes wrong at a bad moment.
+      - key: RunMigrationsOnStartup
+        value: "true"
+
+      # Allowed browser origins. The double underscore is how .NET configuration
+      # reads nested keys from environment variables, and the trailing index
+      # binds an array element.
+      - key: Cors__AllowedOrigins__0
+        sync: false
+
+      # Google OAuth. Set in the Render dashboard, never committed.
+      - key: Authentication__Google__ClientId
+        sync: false
+      - key: Authentication__Google__ClientSecret
+        sync: false
+
+      # Seeded role allowlists, comma separated. Unknown emails are refused
+      # rather than auto-created.
+      - key: Seed__AdminEmails
+        sync: false
+      - key: Seed__GamesLeaderEmails
+        sync: false
+      - key: Seed__ScorekeeperEmails
+        sync: false
