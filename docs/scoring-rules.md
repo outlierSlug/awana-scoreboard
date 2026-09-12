@@ -129,8 +129,19 @@ earned the team 20 points. Any team could earn it, including the one that had
 just finished last, so it is recorded per team on the round rather than tied to
 a placement.
 
-Points are stored to three decimal places and rounded for display to two by
-default, half away from zero.
+## Whole numbers
+
+Scores are awarded as whole numbers by default.
+
+This costs nothing on the official table. Every split it can produce is already
+an integer: any two adjacent places average to 35, 25 or 15, any three to 30 or
+20, and all four to 25. Showing decimals would only ever add ".00" to a number
+on a projector. A test asserts this across every tie pattern, so the claim
+cannot quietly stop being true.
+
+A church using a table that does divide unevenly, such as 50 / 25 / 15 / 10, can
+raise the precision in its scoring profile. The underlying column stores three
+decimal places either way, so nothing is lost by changing the setting later.
 
 ## Worked examples
 
@@ -158,9 +169,12 @@ happened to Red.
 
 ### Rounding
 
+Only reachable on a table that divides unevenly, which the official one does not.
+
 With a table of 50 / 25 / 15 / 10, three teams tied for second consume slots 2,
-3 and 4, worth 25 + 15 + 10 = 50. Split three ways that is 16.666..., which is
-recorded as 16.67 each.
+3 and 4, worth 25 + 15 + 10 = 50. Split three ways that is 16.666..., recorded
+as 17 at the default whole number precision, or 16.67 if the profile asks for
+two decimal places.
 
 ### More or fewer teams than the table
 

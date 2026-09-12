@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: oklch(0.205 0 0); } a:hover { color: oklch(0.145 0 0); }
+  </style>
+</helmet>
+
+<div style="width: 1180px; height: 460px; background: oklch(1 0 0); color: oklch(0.145 0 0); padding: 28px 32px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px;">
+
+  <div>
+    <div style="font-size: 18px; font-weight: 600;">A games night, end to end</div>
+    <div style="font-size: 13px; color: oklch(0.556 0 0); margin-top: 3px;">Session status governs what the API will accept. Everything in the middle repeats 4 to 8 times.</div>
+  </div>
+
+  <!-- Lifecycle -->
+  <div style="display: flex; align-items: center; gap: 12px;">
+
+    <div style="flex-grow: 1; border-radius: 14px; border: 1px solid oklch(0.922 0 0); padding: 14px 16px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <span style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.556 0 0); display: block;"></span>
+        <span style="font-size: 14px; font-weight: 600;">Setup</span>
+      </div>
+      <div style="font-size: 12px; line-height: 1.55; color: oklch(0.556 0 0);">Pick division, optional headcounts. No rounds accepted yet.</div>
+    </div>
+
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.556 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+
+    <div style="flex-grow: 1.6; border-radius: 14px; border: 1px solid oklch(0.145 0 0); padding: 14px 16px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <span style="width: 9px; height: 9px; border-radius: 999px; background: #22c55e; display: block;"></span>
+        <span style="font-size: 14px; font-weight: 600;">Running</span>
+        <span style="font-size: 11px; color: oklch(0.556 0 0); margin-left: 2px;">scoring rules frozen</span>
+      </div>
+      <div style="font-size: 12px; line-height: 1.55; color: oklch(0.371 0 0);">Rounds are recorded. Every confirmed round pushes to the board instantly.</div>
+    </div>
+
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.556 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+
+    <div style="flex-grow: 1; border-radius: 14px; border: 1px solid oklch(0.922 0 0); padding: 14px 16px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <span style="width: 9px; height: 9px; border-radius: 999px; background: oklch(0.556 0 0); display: block;"></span>
+        <span style="font-size: 14px; font-weight: 600;">Finished</span>
+      </div>
+      <div style="font-size: 12px; line-height: 1.55; color: oklch(0.556 0 0);">Final standings. A round posted now is rejected. Reopen if needed.</div>
+    </div>
+
+  </div>
+
+  <!-- The round loop -->
+  <div style="flex-grow: 1; border-radius: 14px; background: oklch(0.97 0 0); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.371 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path><path d="M3 21v-5h5"></path></svg>
+      <span style="font-size: 13px; font-weight: 600;">Each round</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px;">
+
+      <div style="background: oklch(1 0 0); border-radius: 12px; padding: 12px 13px;">
+        <div style="font-size: 12px; font-weight: 600; margin-bottom: 5px;">1 &middot; Pick game</div>
+        <div style="font-size: 11px; line-height: 1.5; color: oklch(0.556 0 0);">Stays selected. The same game usually runs several times.</div>
+      </div>
+
+      <div style="background: oklch(1 0 0); border-radius: 12px; padding: 12px 13px;">
+        <div style="font-size: 12px; font-weight: 600; margin-bottom: 5px;">2 &middot; Tap finish order</div>
+        <div style="font-size: 11px; line-height: 1.5; color: oklch(0.556 0 0);">One tap per team as it crosses. The only thing done during the race.</div>
+      </div>
+
+      <div style="background: oklch(1 0 0); border-radius: 12px; padding: 12px 13px;">
+        <div style="font-size: 12px; font-weight: 600; margin-bottom: 5px;">3 &middot; Fix it after</div>
+        <div style="font-size: 11px; line-height: 1.5; color: oklch(0.556 0 0);">Tie, disqualify, not playing. Applied to a row that exists, never a mode set first.</div>
+      </div>
+
+      <div style="background: oklch(1 0 0); border-radius: 12px; padding: 12px 13px;">
+        <div style="font-size: 12px; font-weight: 600; margin-bottom: 5px;">4 &middot; Read the points</div>
+        <div style="font-size: 11px; line-height: 1.5; color: oklch(0.556 0 0);">The reasoning is shown in words before anything is saved.</div>
+      </div>
+
+      <div style="background: oklch(0.205 0 0); color: oklch(0.985 0 0); border-radius: 12px; padding: 12px 13px;">
+        <div style="font-size: 12px; font-weight: 600; margin-bottom: 5px;">5 &middot; Confirm</div>
+        <div style="font-size: 11px; line-height: 1.5; opacity: 0.72;">Never optimistic. The board updates when the server accepts it.</div>
+      </div>
+
+    </div>
+
+    <div style="display: flex; gap: 18px; padding-top: 2px;">
+      <div style="font-size: 11px; color: oklch(0.556 0 0);"><strong style="color: oklch(0.371 0 0); font-weight: 600;">Wrong before confirming?</strong> Undo, up to 20 steps.</div>
+      <div style="font-size: 11px; color: oklch(0.556 0 0);"><strong style="color: oklch(0.371 0 0); font-weight: 600;">Wrong after?</strong> Void or edit the round. Totals recompute for every team.</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

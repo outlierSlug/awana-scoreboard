@@ -260,13 +260,40 @@ public class ScoringEngineTests
     public void Uneven_splits_round_to_the_configured_precision()
     {
         // Slots 2, 3 and 4 are worth 25 + 15 + 10 = 50, split three ways.
-        var config = ScoringConfig.Default with { PlacePoints = [50m, 25m, 15m, 10m] };
+        var config = ScoringConfig.Default with
+        {
+            PlacePoints = [50m, 25m, 15m, 10m],
+            Rounding = new RoundingSpec(2, RoundingMode.HalfAwayFromZero),
+        };
+
         var outcome = ScoreFour(1, 2, 2, 2, config);
 
         Assert.Equal(50m, outcome.PointsFor(Teams.Red));
         Assert.Equal(16.67m, outcome.PointsFor(Teams.Blue));
         Assert.Equal(16.67m, outcome.PointsFor(Teams.Yellow));
         Assert.Equal(16.67m, outcome.PointsFor(Teams.Green));
+    }
+
+    [Fact]
+    public void Official_table_never_needs_a_decimal()
+    {
+        // The reason whole numbers are the default. Every split on the official
+        // table lands on an integer, so nothing is lost by hiding decimals.
+        int?[][] patterns =
+        [
+            [1, 2, 3, 4], [1, 1, 3, 4], [1, 2, 2, 4], [1, 2, 3, 3],
+            [1, 1, 3, 3], [1, 1, 1, 4], [1, 2, 2, 2], [1, 1, 1, 1],
+        ];
+
+        foreach (var places in patterns)
+        {
+            var outcome = ScoreFour(places[0], places[1], places[2], places[3]);
+
+            Assert.All(outcome.Awards, a =>
+                Assert.True(
+                    a.Points == decimal.Truncate(a.Points),
+                    $"Pattern [{string.Join(",", places)}] produced {a.Points}, which is not whole."));
+        }
     }
 
     [Fact]
@@ -402,7 +429,7 @@ public class ScoringEngineTests
         var red = outcome.AwardFor(Teams.Red).Explanation;
 
         Assert.Contains("Tied for 1st with Blue", red);
-        Assert.Contains("35.00", red);
+        Assert.Contains("35", red);
     }
 
     [Fact]

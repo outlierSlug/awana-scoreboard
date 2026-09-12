@@ -53,7 +53,17 @@ public enum RoundingMode
 /// <summary>How many decimal places an award is rounded to, and how ties in the last digit break.</summary>
 public readonly record struct RoundingSpec(int Decimals, RoundingMode Mode)
 {
-    public static RoundingSpec Default => new(2, RoundingMode.HalfAwayFromZero);
+    /// <summary>
+    /// Whole numbers.
+    ///
+    /// This costs nothing on the official 40 / 30 / 20 / 10 table, where every
+    /// possible split is already an integer: any two adjacent places average to
+    /// 35, 25 or 15, any three to 30 or 20, and all four to 25. Decimals would
+    /// only ever show as ".00" on a projector.
+    ///
+    /// A church using a table that does divide unevenly can raise this.
+    /// </summary>
+    public static RoundingSpec Default => new(0, RoundingMode.HalfAwayFromZero);
 }
 
 /// <summary>

@@ -1,0 +1,56 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 390, "h": 844, "title": "Scorekeeper, phone", "is_interactive": true },
+    { "file": "ConsoleDesktop.dc.html", "x": 520, "y": 0, "w": 1440, "h": 900, "title": "Scorekeeper, desktop", "is_interactive": true },
+    { "file": "BoardTV.dc.html", "x": 0, "y": 1040, "w": 1280, "h": 720, "title": "Board, 16:9" },
+    { "file": "BoardProjector.dc.html", "x": 1400, "y": 1040, "w": 1024, "h": 768, "title": "Board, 4:3 projector" },
+    { "file": "BoardPhone.dc.html", "x": 2520, "y": 1040, "w": 390, "h": 844, "title": "Board, phone" },
+    { "file": "SessionSetup.dc.html", "x": 0, "y": 2024, "w": 390, "h": 844, "title": "Start a session" },
+    { "file": "Flow.dc.html", "x": 520, "y": 2024, "w": 1180, "h": 460, "title": "Session flow" }
+  ],
+  "annotations": [
+    {
+      "id": "try-it",
+      "x": 0,
+      "y": -230,
+      "w": 420,
+      "text": "Both scorekeeper artboards are live. Tap teams in finish order, then try the swap arrows, DQ, Bonus, Remove and the x2 multiplier.\n\nThe points panel runs the real averaging rule, so what you see is what the engine would award. x2 doubles placement points but never a bonus."
+    },
+    {
+      "id": "two-ways-to-tie",
+      "x": 2060,
+      "y": 120,
+      "w": 320,
+      "text": "Two ways to record a tie, because they happen at different moments.\n\nKNOWN UP FRONT, as announced: press Tie, then tap Blue and Yellow. Both take the same place. This is the flow from the previous version and it maps onto the sentence.\n\nREALIZED AFTER: tap normally, then press Tie up on the lower row.\n\nBoth end in the same state."
+    },
+    {
+      "id": "board-fits-anything",
+      "x": 0,
+      "y": 1810,
+      "w": 440,
+      "text": "The board is driven from a laptop into a projector, so nothing is sized in pixels. Every value is in vh and these two frames are the SAME markup at 16:9 and at 4:3.\n\nFour rows always fill the height, names truncate rather than push the totals off the edge, and nothing scrolls at any shape.\n\nTeam names always show. Red and Green are two of the four teams and roughly 8% of boys cannot tell them apart."
+    },
+    {
+      "id": "nothing-until-confirm",
+      "x": 2060,
+      "y": 560,
+      "w": 320,
+      "text": "Everything is reversible until Confirm, and the console says so.\n\nSwap arrows reorder. Undo steps back through every change. Clear drops the round. Remove takes one team out. DQ and Bonus toggle freely.\n\nOnly Confirm reaches the board, and it stays disabled with the reason shown until every team has a place."
+    },
+    {
+      "id": "integers",
+      "x": 1760,
+      "y": 2024,
+      "w": 320,
+      "text": "Whole numbers on screen. With the 40/30/20/10 table every split is already an integer: two-way ties give 35, 25 or 15, three-way give 30 or 20, four-way gives 25. Nothing is lost by hiding decimals, and the precision stays a setting rather than a hardcoded format."
+    },
+    {
+      "id": "bonus-open",
+      "x": 1760,
+      "y": 2300,
+      "w": 320,
+      "text": "Open: Bonus cycles 0, 10, 20 here so it is tappable in a mockup. The real control is a number field, since the archive shows the amount varied."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}
