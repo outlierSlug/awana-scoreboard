@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A new push supersedes an in-flight run on the same branch.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Awana.Scoring holds the tie and DQ rules, and it is testable in
+      # milliseconds only because it cannot reach EF Core, ASP.NET, or a
+      # database. That property is easy to destroy with one convenient using
+      # statement and hard to notice in review, so it is checked here rather
+      # than trusted to discipline.
+      - name: Awana.Scoring must have zero dependencies
+        run: |
+          if grep -qE '<(Package|Project)Reference' apps/api/src/Awana.Scoring/Awana.Scoring.csproj; then
+            echo "::error file=apps/api/src/Awana.Scoring/Awana.Scoring.csproj::Awana.Scoring must not reference anything. Move the dependency to Awana.Data or Awana.Api."
+            exit 1
+          fi
+          echo "Awana.Scoring is clean."
+
+      - name: Restore
+        run: dotnet restore apps/api/Awana.slnx
+
+      - name: Build
+        run: dotnet build apps/api/Awana.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test apps/api/Awana.slnx --no-build --configuration Release --verbosity normal
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: apps/web
+
+      - name: Lint
+        run: npm run lint
+        working-directory: apps/web
+
+      # `npm run build` runs tsc and then vite build, so this covers both the
+      # type check and the bundle that Cloudflare Pages will produce.
+      - name: Type check and build
+        run: npm run build
+        working-directory: apps/web
+        env:
+          # Vite inlines this at build time and src/config.ts throws without
+          # it, so CI has to supply a value. It is never used at runtime here.
+          VITE_API_BASE_URL: http://localhost:5201
