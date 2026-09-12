@@ -374,18 +374,21 @@ class Component extends DCLogic {
            centered in the block, placed or not. */
         rankStyle: isPlaced
           ? 'position: absolute; top: 11px; right: 11px; width: 27px; height: 27px;' +
-            'border-radius: 999px; background: rgba(255,255,255,0.3);' +
+            'border-radius: 999px; background: rgba(0,0,0,0.12);' +
             'display: flex; align-items: center; justify-content: center;' +
             'font-size: 14px; font-weight: 700;'
           : 'display: none;',
         buttonStyle:
           'position: relative; height: 160px; border-radius: 22px;' +
           'display: flex; align-items: center; justify-content: center;' +
-          'background: ' + t.color + '; color: ' + t.fg + ';' +
-          /* Already placed is shown with an inset ring, not by fading the
-             block. Fading dropped Yellow below readable contrast, and the
-             corner chip already says it has been used. */
-          (isPlaced ? 'box-shadow: inset 0 0 0 6px rgba(255,255,255,0.55);' : '') +
+          /* A placed block lightens toward white, keeping its own hue, so the
+             teams still to come stay solid and obvious beside it.
+             Not grayscale, which turned Yellow to tan and Blue to slate, and
+             not opacity, which took Yellow below readable contrast. Every
+             lightened block is pale enough to carry the same dark label. */
+          (isPlaced
+            ? 'background: color-mix(in oklch, ' + t.color + ', white 62%); color: oklch(0.145 0 0);'
+            : 'background: ' + t.color + '; color: ' + t.fg + ';') +
           (s.tieArmed && !isPlaced
             ? 'border: 3px solid oklch(0.145 0 0);'
             : 'border: 3px solid transparent;'),
