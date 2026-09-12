@@ -108,7 +108,7 @@ public sealed class ScoringEngine : IScoringEngine
         // assigned, because some rules change who is standing where.
         var ordering = ApplyDqRule(placed, config);
 
-        // Normalise to contiguous 1..n so that recording places as 1, 2, 4
+        // Normalize to contiguous 1..n so that recording places as 1, 2, 4
         // scores identically to 1, 2, 3.
         var rankOf = ordering.SlotConsumers
             .Select(e => ordering.EffectivePlace[e.TeamId])
@@ -183,7 +183,7 @@ public sealed class ScoringEngine : IScoringEngine
             case DqRule.DropToLast:
             {
                 // Park the disqualified behind everyone else, preserving their
-                // relative order, then let normalisation compact the numbers.
+                // relative order, then let normalization compact the numbers.
                 var lastPlace = placed.Max(e => e.Place!.Value);
                 var effective = new Dictionary<Guid, int>();
 

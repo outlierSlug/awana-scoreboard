@@ -55,7 +55,7 @@ public class ScoringEngineTests
     [InlineData(1, 2, 4, 7)]
     [InlineData(2, 4, 6, 8)]
     [InlineData(10, 20, 30, 40)]
-    public void Non_contiguous_places_are_normalised(int red, int blue, int yellow, int green)
+    public void Non_contiguous_places_are_normalized(int red, int blue, int yellow, int green)
     {
         var outcome = ScoreFour(red, blue, yellow, green);
 

@@ -57,7 +57,7 @@ A locally invented bonus, and the reason session totals are not always a
 multiple of 100.
 
 After a relay finished, the finisher could take a beanbag and throw it at a
-bucket in the middle of the centre circle. Landing it earned the team **20
+bucket in the middle of the center circle. Landing it earned the team **20
 points**. Any team could earn it, including one that had just come last.
 
 This is a per team, per round bonus of a fixed amount. The engine models it
@@ -70,4 +70,4 @@ Four teams per division: Red, Blue, Green, Yellow. Rounds were never run with
 any other number.
 
 Sparks Red and T&T Red are different teams with separate histories, so they are
-separate rows rather than a shared colour lookup.
+separate rows rather than a shared color lookup.

@@ -40,7 +40,7 @@ public enum DqRule
     ZeroAndPromoteOthers = 3,
 }
 
-/// <summary>Midpoint behaviour when rounding an awarded score.</summary>
+/// <summary>Midpoint behavior when rounding an awarded score.</summary>
 public enum RoundingMode
 {
     /// <summary>0.125 becomes 0.13. What people expect when checking by hand.</summary>
@@ -59,7 +59,7 @@ public readonly record struct RoundingSpec(int Decimals, RoundingMode Mode)
 /// <summary>
 /// Everything a church can configure about scoring.
 ///
-/// Team names, colours and counts are deliberately absent. Teams are database
+/// Team names, colors and counts are deliberately absent. Teams are database
 /// rows with history attached, they differ between divisions, and they are
 /// referenced by results. The points table's length is independent of how many
 /// teams exist: a four entry table with six teams is well defined, because

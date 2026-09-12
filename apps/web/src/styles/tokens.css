@@ -8,24 +8,24 @@
   IMPORTANT, about the team colors below.
 
   These are SEED values only. They are what the database seeder writes into
-  Team.ColorHex and what the admin colour picker offers as defaults. At render
-  time the authoritative colour comes from the API, because tenants configure
+  Team.ColorHex and what the admin color picker offers as defaults. At render
+  time the authoritative color comes from the API, because tenants configure
   their own. So a team row is styled from an inline custom property fed by the
   server, never from a bg-team-red class:
 
     <div style={{ '--team': team.colorHex, '--team-fg': team.textOnColorHex }}
          className="bg-[var(--team)] text-[var(--team-fg)]">
 
-  Getting that backwards is how the colour list ends up hardcoded in
+  Getting that backwards is how the color list ends up hardcoded in
   components again, which is where the v1 draft went wrong.
 
-  Each team carries an explicit foreground colour. Text is never rendered in
-  the team colour itself, because yellow on a dark board is unreadable and
+  Each team carries an explicit foreground color. Text is never rendered in
+  the team color itself, because yellow on a dark board is unreadable and
   yellow is one of the four teams.
 */
 
 @theme {
-  /* Team seed colours. Every pairing below clears 4.5:1 against its
+  /* Team seed colors. Every pairing below clears 4.5:1 against its
      foreground, so they stay legible in the dense app UI as well as on the
      board where the type is enormous. */
   --color-team-red: #dc2626;

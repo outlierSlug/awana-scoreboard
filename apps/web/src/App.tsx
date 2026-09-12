@@ -12,7 +12,7 @@ interface Health {
 /*
   Placeholder teams for the scaffold only.
 
-  Real teams come from the API, including their colours, because tenants
+  Real teams come from the API, including their colors, because tenants
   configure them. The inline custom property below is the pattern the whole app
   uses, so it is written the right way round from the start even while the
   values are still hardcoded here.
@@ -123,7 +123,7 @@ export default function App() {
 
         <section>
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-            Team colour tokens
+            Team color tokens
           </h2>
           <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {PLACEHOLDER_TEAMS.map((team) => (

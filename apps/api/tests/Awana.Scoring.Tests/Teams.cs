@@ -1,7 +1,7 @@
 namespace Awana.Scoring.Tests;
 
 /// <summary>
-/// Fixed team ids so failures name a colour rather than a random guid.
+/// Fixed team ids so failures name a color rather than a random guid.
 /// </summary>
 internal static class Teams
 {

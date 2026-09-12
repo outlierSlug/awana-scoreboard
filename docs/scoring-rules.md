@@ -27,12 +27,12 @@ value, which defaults to 0.
 ## How a round is scored
 
 1. Every team is either **placed** at a finishing position, or marked **absent**.
-2. Places are normalised so they run 1, 2, 3 with no gaps. Recording places as
+2. Places are normalized so they run 1, 2, 3 with no gaps. Recording places as
    1, 2, 4 scores identically to 1, 2, 3.
 3. Teams that finished level share a **place group**.
 4. Each group consumes as many **slots** as it has members, starting from the
    next free slot.
-5. The points for the slots a group consumed are totalled and split as the tie
+5. The points for the slots a group consumed are totaled and split as the tie
    rule says. By default they are averaged.
 6. The round **multiplier** is applied.
 7. **Bonus points** are added afterwards, so they are never multiplied.
@@ -45,12 +45,12 @@ Absent teams consume no slots, earn no points, and do not shift anyone else.
 The default rule is **average the shared slots**.
 
 Two teams tied for first consume slots 1 and 2. Those slots are worth 40 and 30,
-totalling 70, so each team earns 35. The next team along takes slot 3 and earns
+totaling 70, so each team earns 35. The next team along takes slot 3 and earns
 20, not 30. A tie never lets the team behind it gain from someone else's tie.
 
 Three other tie rules are available as configuration:
 
-| Rule | Behaviour |
+| Rule | Behavior |
 |---|---|
 | `AverageSharedSlots` | Default. Every tied team gets the average of the slots consumed. |
 | `HighestSlot` | Every tied team gets the best slot's value. Generous, and inflates the round total. |
@@ -81,7 +81,7 @@ inside tie groups.
 
 Three other disqualification rules are available:
 
-| Rule | Behaviour |
+| Rule | Behavior |
 |---|---|
 | `ZeroButHoldSlot` | Default. Keeps its slot, earns 0, promotes nobody. |
 | `ZeroAndPromoteOthers` | Removed from the ordering, so everyone behind it moves up. |
@@ -99,7 +99,7 @@ is deliberate: bonuses are usually a flat award for a specific achievement, and
 multiplying them tends to surprise people.
 
 The worked example from this church is the **bonus bucket**. After a relay, the
-finisher could throw a beanbag at a bucket in the centre circle, and landing it
+finisher could throw a beanbag at a bucket in the center circle, and landing it
 earned the team 20 points. Any team could earn it, including the one that had
 just finished last, so it is recorded per team on the round rather than tied to
 a placement.
