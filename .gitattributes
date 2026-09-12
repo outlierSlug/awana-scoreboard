@@ -1,0 +1,18 @@
+# Normalize line endings so the repo is identical on Windows and in Linux containers.
+* text=auto eol=lf
+
+# Files that must stay LF. CRLF breaks these inside the Docker build.
+*.sh          text eol=lf
+Dockerfile    text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+
+# Windows-only files that should stay CRLF.
+*.cmd         text eol=crlf
+*.ps1         text eol=crlf
+
+# Binary. Never diff or normalize.
+*.png         binary
+*.jpg         binary
+*.ico         binary
+*.woff2       binary
