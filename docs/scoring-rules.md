@@ -98,6 +98,12 @@ are added after the multiplier, so a double round does not double a bonus. This
 is deliberate: bonuses are usually a flat award for a specific achievement, and
 multiplying them tends to surprise people.
 
+The worked example from this church is the **bonus bucket**. After a relay, the
+finisher could throw a beanbag at a bucket in the centre circle, and landing it
+earned the team 20 points. Any team could earn it, including the one that had
+just finished last, so it is recorded per team on the round rather than tied to
+a placement.
+
 Points are stored to three decimal places and rounded for display to two by
 default, half away from zero.
 
