@@ -38,18 +38,12 @@
       <div style="min-width: 0;">
         <div style="display: flex; align-items: center; gap: 9px;">
           <span style="font-size: 18px; font-weight: 700; letter-spacing: -0.01em;">T&amp;T Games</span>
-          <span style="display: inline-flex; align-items: center; height: 21px; padding: 0 9px; border-radius: 999px; background: color-mix(in oklch, #22c55e, transparent 88%); color: #15803d; font-size: 11px; font-weight: 700; letter-spacing: 0.02em;">RECORDING</span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; color: #15803d; font-size: 13px; font-weight: 600;">
+            <span style="width: 7px; height: 7px; border-radius: 999px; background: #22c55e; display: block;"></span>
+            Live
+          </span>
         </div>
-        <div style="font-size: 13px; color: oklch(0.556 0 0); margin-top: 3px;">Friday, October 2, 2026 &middot; started 7:18 PM</div>
-      </div>
-      <div style="width: 1px; height: 36px; background: oklch(0.922 0 0);"></div>
-      <div style="display: flex; align-items: center; gap: 18px; font-size: 13px; color: oklch(0.556 0 0); white-space: nowrap;">
-        <span><strong style="color: oklch(0.145 0 0); font-weight: 700;">Round 4</strong> in progress</span>
-        <span>3 recorded, 1 voided</span>
-        <span style="display: inline-flex; align-items: center; gap: 6px;">
-          <span style="width: 7px; height: 7px; border-radius: 999px; background: #22c55e; display: block;"></span>
-          Board connected
-        </span>
+        <div style="font-size: 13px; color: oklch(0.556 0 0); margin-top: 3px;">Friday, October 2, 2026 &middot; Round 4</div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
@@ -77,13 +71,18 @@
       </div>
 
       <div>
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 9px;">
           <span style="{{tapLabelStyle}}">{{tapLabel}}</span>
-          <button onClick="{{toggleTie}}" style="{{tieArmStyle}}">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11l5-5 5 5"></path><path d="M7 18l5-5 5 5"></path></svg>
-            <span>{{tieArmLabel}}</span>
-            <kbd style="background: transparent; border-color: currentColor; color: inherit; opacity: 0.7;">T</kbd>
-          </button>
+          <div style="display: flex; gap: 7px; margin-left: auto;">
+            <button onClick="{{toggleTie}}" style="{{tieArmStyle}}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11l5-5 5 5"></path><path d="M7 18l5-5 5 5"></path></svg>
+              <span>{{tieArmLabel}}</span>
+            </button>
+            <button onClick="{{undo}}" style="{{undoStyle}}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-15-6.7L3 13"></path></svg>
+              <span>Undo</span>
+            </button>
+          </div>
         </div>
         <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
           <sc-for list="{{teams}}" as="team" hint-placeholder-count="4">
@@ -137,10 +136,7 @@
             <div style="font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; width: 74px; flex-shrink: 0;">{{row.points}}</div>
             <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex-grow: 1;">
               <sc-if value="{{row.canTie}}" hint-placeholder-val="{{true}}">
-                <button onClick="{{row.tie}}" style="{{row.chipStyle}}">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11l5-5 5 5"></path><path d="M7 18l5-5 5 5"></path></svg>
-                  <span>Tie up</span>
-                </button>
+                <button onClick="{{row.tie}}" style="{{row.chipStyle}}">Tie</button>
               </sc-if>
               <sc-for list="{{row.members}}" as="m" hint-placeholder-count="1">
                 <button onClick="{{m.dq}}" style="{{m.dqStyle}}">{{m.dqLabel}}</button>
@@ -149,7 +145,9 @@
                 <button onClick="{{m.bonus}}" style="{{m.bonusStyle}}">{{m.bonusLabel}}</button>
               </sc-for>
               <sc-for list="{{row.members}}" as="m" hint-placeholder-count="1">
-                <button onClick="{{m.remove}}" style="{{m.removeStyle}}">{{m.removeLabel}}</button>
+                <button onClick="{{m.remove}}" style="{{m.removeStyle}}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></svg>
+                </button>
               </sc-for>
             </div>
           </div>
@@ -172,13 +170,7 @@
         </div>
         <div style="margin-top: 13px; padding: 11px 12px; border-radius: 12px; background: oklch(0.97 0 0); font-size: 13px; line-height: 1.5; color: oklch(0.371 0 0);">{{reasoning}}</div>
 
-        <div style="display: flex; gap: 8px; margin-top: 14px;">
-          <button onClick="{{undo}}" style="{{undoStyle}}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-15-6.7L3 13"></path></svg>
-            <span>Undo</span>
-          </button>
-          <button style="{{confirmStyle}}">{{confirmLabel}}</button>
-        </div>
+        <button style="{{confirmStyle}}">{{confirmLabel}}</button>
         <div style="margin-top: 8px; font-size: 11px; color: oklch(0.556 0 0); text-align: center;">{{footnote}}</div>
       </div>
 
@@ -378,15 +370,22 @@ class Component extends DCLogic {
       return {
         name: t.name,
         rank: isPlaced ? String(idx + 1) : '',
-        rankStyle:
-          'min-height: 24px; font-size: 14px; font-weight: 700; opacity: 0.9;' +
-          'display: flex; align-items: center; justify-content: center;' +
-          (isPlaced ? 'width: 24px; border-radius: 999px; background: rgba(255,255,255,0.28);' : ''),
+        /* Placement chip in the corner so the team name stays optically
+           centered in the block, placed or not. */
+        rankStyle: isPlaced
+          ? 'position: absolute; top: 11px; right: 11px; width: 27px; height: 27px;' +
+            'border-radius: 999px; background: rgba(255,255,255,0.3);' +
+            'display: flex; align-items: center; justify-content: center;' +
+            'font-size: 14px; font-weight: 700;'
+          : 'display: none;',
         buttonStyle:
-          'height: 160px; border-radius: 22px; display: flex; flex-direction: column;' +
-          'align-items: center; justify-content: center; gap: 8px;' +
+          'position: relative; height: 160px; border-radius: 22px;' +
+          'display: flex; align-items: center; justify-content: center;' +
           'background: ' + t.color + '; color: ' + t.fg + ';' +
-          (isPlaced ? 'opacity: 0.34;' : '') +
+          /* Already placed is shown with an inset ring, not by fading the
+             block. Fading dropped Yellow below readable contrast, and the
+             corner chip already says it has been used. */
+          (isPlaced ? 'box-shadow: inset 0 0 0 6px rgba(255,255,255,0.55);' : '') +
           (s.tieArmed && !isPlaced
             ? 'border: 3px solid oklch(0.145 0 0);'
             : 'border: 3px solid transparent;'),
@@ -446,20 +445,20 @@ class Component extends DCLogic {
             pillStyle:
               'display: inline-flex; align-items: center; height: 28px; padding: 0 11px; border-radius: 9px;' +
               'font-size: 14px; font-weight: 700; background: ' + t.color + '; color: ' + t.fg + ';' +
-              (isDq ? 'opacity: 0.4; text-decoration: line-through;' : ''),
+              (isDq ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''),
 
-            dqLabel: isDq ? 'Undo DQ' : 'DQ',
+            dqLabel: 'DQ',
             dqStyle: CHIP + (isDq
-              ? 'border: 1px solid oklch(0.577 0.245 27.325); background: oklch(1 0 0); color: oklch(0.577 0.245 27.325);'
-              : 'border: 1px solid transparent; background: color-mix(in oklch, oklch(0.577 0.245 27.325), transparent 91%); color: oklch(0.577 0.245 27.325);'),
+              ? 'border: 1px solid oklch(0.577 0.245 27.325); background: color-mix(in oklch, oklch(0.577 0.245 27.325), transparent 88%); color: oklch(0.577 0.245 27.325); font-weight: 700;'
+              : 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.556 0 0);'),
             dq: () => {
               const next = isDq ? s.dq.filter((x) => x !== id) : s.dq.concat([id]);
               self.commit({ dq: next });
             },
 
-            bonusLabel: bonusValue > 0 ? 'Bonus +' + bonusValue : '+ Bonus',
+            bonusLabel: bonusValue > 0 ? '+' + bonusValue : 'Bonus',
             bonusStyle: CHIP + (bonusValue > 0
-              ? 'border: 1px solid oklch(0.145 0 0); background: oklch(1 0 0); color: oklch(0.145 0 0);'
+              ? 'border: 1px solid oklch(0.145 0 0); background: oklch(1 0 0); color: oklch(0.145 0 0); font-weight: 700;'
               : 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.556 0 0);'),
             bonus: () => {
               const nextIdx = (BONUS_STEPS.indexOf(bonusValue) + 1) % BONUS_STEPS.length;
@@ -468,8 +467,9 @@ class Component extends DCLogic {
               self.commit({ bonus: bonus });
             },
 
-            removeLabel: 'Remove',
-            removeStyle: CHIP + 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.556 0 0);',
+            removeStyle:
+              'width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;' +
+              'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.556 0 0);',
             remove: () => {
               const groups = s.groups
                 .map((g) => g.filter((x) => x !== id))
@@ -511,7 +511,7 @@ class Component extends DCLogic {
       setX1: () => self.commit({ multiplier: 1 }),
       setX2: () => self.commit({ multiplier: 2 }),
 
-      tapLabel: s.tieArmed ? 'Click every team that tied' : 'Tap in finish order',
+      tapLabel: s.tieArmed ? 'Click teams that tied' : 'Click in finish order',
       tapLabelStyle:
         'font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;' +
         (s.tieArmed ? 'color: oklch(0.145 0 0);' : 'color: oklch(0.556 0 0);'),
@@ -533,10 +533,10 @@ class Component extends DCLogic {
       },
 
       undoStyle:
-        'height: 48px; padding: 0 16px; border-radius: 13px; font-size: 15px; font-weight: 600;' +
-        'display: flex; align-items: center; gap: 7px;' +
+        'height: 32px; padding: 0 11px; border-radius: 10px; font-size: 12px; font-weight: 600;' +
+        'display: inline-flex; align-items: center; gap: 6px;' +
         (canUndo
-          ? 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.145 0 0);'
+          ? 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.371 0 0);'
           : 'border: 1px solid oklch(0.97 0 0); background: oklch(1 0 0); color: oklch(0.922 0 0); cursor: default;'),
       undo: () => {
         if (!canUndo) return;
@@ -552,14 +552,12 @@ class Component extends DCLogic {
 
       confirmLabel: blocking ? blocking : 'Confirm round',
       confirmStyle:
-        'flex-grow: 1; height: 48px; border-radius: 13px; border: none; font-size: 15px; font-weight: 700;' +
+        'width: 100%; height: 48px; border-radius: 13px; border: none; font-size: 15px; font-weight: 700;' +
         (blocking
           ? 'background: oklch(0.97 0 0); color: oklch(0.556 0 0); cursor: not-allowed;'
           : 'background: oklch(0.205 0 0); color: oklch(0.985 0 0);'),
 
-      footnote: blocking
-        ? 'Every team needs a place before this round can be sent.'
-        : 'Nothing reaches the board until you confirm.',
+      footnote: 'Nothing reaches the board until you confirm.',
     };
   }
 }

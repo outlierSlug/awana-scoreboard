@@ -21,35 +21,24 @@
 
 <div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: oklch(1 0 0); color: oklch(0.145 0 0); overflow: hidden;">
 
-  <!-- Session bar. Full date, because a scorekeeper opening this on a phone
-       should never have to guess which night they are recording. -->
-  <div style="flex-shrink: 0; border-bottom: 1px solid oklch(0.922 0 0); padding: 12px 16px 10px;">
-    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
-      <div style="min-width: 0;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 17px; font-weight: 700; letter-spacing: -0.01em;">T&amp;T Games</span>
-          <span style="display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; background: color-mix(in oklch, #22c55e, transparent 88%); color: #15803d; font-size: 11px; font-weight: 700; letter-spacing: 0.02em;">RECORDING</span>
-        </div>
-        <div style="font-size: 13px; color: oklch(0.556 0 0); margin-top: 3px;">Friday, October 2, 2026</div>
+  <!-- Session bar -->
+  <div style="flex-shrink: 0; padding: 13px 16px 11px; border-bottom: 1px solid oklch(0.922 0 0);">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 9px; min-width: 0;">
+        <span style="font-size: 17px; font-weight: 700; letter-spacing: -0.01em;">T&amp;T Games</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px; color: #15803d; font-size: 12px; font-weight: 600;">
+          <span style="width: 7px; height: 7px; border-radius: 999px; background: #22c55e; display: block;"></span>
+          Live
+        </span>
       </div>
-      <button style="height: 38px; padding: 0 11px; border-radius: 11px; border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); font-size: 13px; font-weight: 600; color: oklch(0.145 0 0); display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>
-        <span>History</span>
+      <button style="width: 38px; height: 38px; border-radius: 11px; border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.371 0 0); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 14l4-4 3 3 5-6"></path></svg>
       </button>
     </div>
-
-    <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: oklch(0.556 0 0);">
-      <span style="font-weight: 600; color: oklch(0.145 0 0);">Round 4</span>
-      <span>&middot;</span>
-      <span>3 recorded, 1 voided</span>
-      <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 5px;">
-        <span style="width: 7px; height: 7px; border-radius: 999px; background: #22c55e; display: block;"></span>
-        Board connected
-      </span>
-    </div>
+    <div style="font-size: 13px; color: oklch(0.556 0 0); margin-top: 3px;">Friday, October 2, 2026 &middot; Round 4</div>
   </div>
 
-  <!-- Game and round configuration -->
+  <!-- Game and multiplier -->
   <div style="margin: 12px 16px 0; border-radius: 16px; background: oklch(0.97 0 0); padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0;">
     <button style="display: flex; align-items: center; gap: 7px; border: none; background: none; padding: 0; color: oklch(0.145 0 0);">
       <span style="font-size: 15px; font-weight: 600;">Baton Relay</span>
@@ -61,20 +50,27 @@
     </div>
   </div>
 
-  <!-- Team blocks -->
-  <div style="padding: 13px 16px 10px; flex-shrink: 0;">
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px;">
+  <!-- Team blocks, with Tie and Undo right where the thumb already is -->
+  <div style="padding: 12px 16px 10px; flex-shrink: 0;">
+    <div style="display: flex; align-items: center; gap: 7px; margin-bottom: 9px;">
       <span style="{{tapLabelStyle}}">{{tapLabel}}</span>
-      <button onClick="{{toggleTie}}" style="{{tieArmStyle}}">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11l5-5 5 5"></path><path d="M7 18l5-5 5 5"></path></svg>
-        <span>{{tieArmLabel}}</span>
-      </button>
+      <div style="display: flex; gap: 7px; margin-left: auto;">
+        <button onClick="{{toggleTie}}" style="{{tieArmStyle}}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11l5-5 5 5"></path><path d="M7 18l5-5 5 5"></path></svg>
+          <span>{{tieArmLabel}}</span>
+        </button>
+        <button onClick="{{undo}}" style="{{undoStyle}}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-15-6.7L3 13"></path></svg>
+          <span>Undo</span>
+        </button>
+      </div>
     </div>
+
     <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
       <sc-for list="{{teams}}" as="team" hint-placeholder-count="4">
         <button onClick="{{team.tap}}" style="{{team.buttonStyle}}">
           <span style="{{team.rankStyle}}">{{team.rank}}</span>
-          <span style="font-size: 19px; font-weight: 700; letter-spacing: -0.01em;">{{team.name}}</span>
+          <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em;">{{team.name}}</span>
         </button>
       </sc-for>
     </div>
@@ -89,8 +85,8 @@
 
     <div style="flex-grow: 1; min-height: 0; overflow-y: auto;">
       <sc-if value="{{isEmpty}}" hint-placeholder-val="{{false}}">
-        <div style="border: 1px dashed oklch(0.922 0 0); border-radius: 16px; padding: 20px 16px; text-align: center; color: oklch(0.556 0 0); font-size: 13px; line-height: 1.5;">
-          Nothing recorded yet.<br>Tap a team as it crosses the line.
+        <div style="border: 1px dashed oklch(0.922 0 0); border-radius: 16px; padding: 20px 16px; text-align: center; color: oklch(0.556 0 0); font-size: 13px;">
+          Tap a team as it crosses.
         </div>
       </sc-if>
 
@@ -98,13 +94,13 @@
         <sc-for list="{{rows}}" as="row" hint-placeholder-count="2">
           <div style="border: 1px solid oklch(0.922 0 0); border-radius: 16px; padding: 9px 10px;">
             <div style="display: flex; align-items: center; gap: 9px;">
-              <div style="width: 26px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: oklch(0.556 0 0);">{{row.rank}}</div>
+              <div style="width: 24px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: oklch(0.556 0 0);">{{row.rank}}</div>
               <div style="display: flex; flex-wrap: wrap; gap: 4px; flex-grow: 1; min-width: 0;">
                 <sc-for list="{{row.members}}" as="m" hint-placeholder-count="1">
                   <span style="{{m.pillStyle}}">{{m.label}}</span>
                 </sc-for>
               </div>
-              <div style="font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums;">{{row.points}}</div>
+              <div style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">{{row.points}}</div>
             </div>
             <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px;">
               <button onClick="{{row.up}}" style="{{row.upStyle}}">
@@ -114,10 +110,7 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M19 12l-7 7-7-7"></path></svg>
               </button>
               <sc-if value="{{row.canTie}}" hint-placeholder-val="{{true}}">
-                <button onClick="{{row.tie}}" style="{{row.chipStyle}}">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11l5-5 5 5"></path><path d="M7 18l5-5 5 5"></path></svg>
-                  <span>Tie up</span>
-                </button>
+                <button onClick="{{row.tie}}" style="{{row.chipStyle}}">Tie</button>
               </sc-if>
               <sc-for list="{{row.members}}" as="m" hint-placeholder-count="1">
                 <button onClick="{{m.dq}}" style="{{m.dqStyle}}">{{m.dqLabel}}</button>
@@ -126,7 +119,9 @@
                 <button onClick="{{m.bonus}}" style="{{m.bonusStyle}}">{{m.bonusLabel}}</button>
               </sc-for>
               <sc-for list="{{row.members}}" as="m" hint-placeholder-count="1">
-                <button onClick="{{m.remove}}" style="{{m.removeStyle}}">{{m.removeLabel}}</button>
+                <button onClick="{{m.remove}}" style="{{m.removeStyle}}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></svg>
+                </button>
               </sc-for>
             </div>
           </div>
@@ -135,12 +130,12 @@
     </div>
   </div>
 
-  <!-- Preview and the authoritative push -->
+  <!-- Preview and confirm -->
   <div style="flex-shrink: 0; margin: 10px 16px 16px; border-radius: 18px; border: 1px solid oklch(0.922 0 0); overflow: hidden;">
-    <div style="padding: 11px 13px 12px;">
-      <div style="display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px;">
+    <div style="padding: 12px 13px;">
+      <div style="display: flex; justify-content: space-between; gap: 6px; margin-bottom: 9px;">
         <sc-for list="{{preview}}" as="p" hint-placeholder-count="4">
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; flex-grow: 1;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; flex-grow: 1;">
             <span style="{{p.dotStyle}}"></span>
             <span style="{{p.valueStyle}}">{{p.value}}</span>
           </div>
@@ -149,15 +144,10 @@
       <div style="font-size: 12px; line-height: 1.45; color: oklch(0.371 0 0);">{{reasoning}}</div>
     </div>
 
-    <div style="border-top: 1px solid oklch(0.922 0 0); padding: 10px; display: flex; gap: 8px;">
-      <button onClick="{{undo}}" style="{{undoStyle}}">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-15-6.7L3 13"></path></svg>
-        <span>Undo</span>
-      </button>
+    <div style="border-top: 1px solid oklch(0.922 0 0); padding: 10px;">
       <button style="{{confirmStyle}}">{{confirmLabel}}</button>
+      <div style="margin-top: 8px; font-size: 11px; color: oklch(0.556 0 0); text-align: center;">{{footnote}}</div>
     </div>
-
-    <div style="padding: 0 13px 11px; font-size: 11px; color: oklch(0.556 0 0); text-align: center;">{{footnote}}</div>
   </div>
 
 </div>
@@ -177,17 +167,16 @@ const TEAMS = [
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 
 const CHIP =
-  'height: 38px; padding: 0 11px; border-radius: 11px; font-size: 13px; font-weight: 500;' +
+  'height: 36px; padding: 0 11px; border-radius: 11px; font-size: 13px; font-weight: 500;' +
   'display: inline-flex; align-items: center; gap: 5px;';
 
 const ICON_CHIP =
-  'width: 38px; height: 38px; border-radius: 11px; display: inline-flex;' +
+  'width: 36px; height: 36px; border-radius: 11px; display: inline-flex;' +
   'align-items: center; justify-content: center;';
 
-/* Whole numbers on screen. With the official 40/30/20/10 table every possible
-   split is already an integer: two-way ties give 35, 25 or 15, three-way give
-   30 or 20, four-way gives 25. So nothing is lost by hiding the decimals, and
-   the precision is a configurable setting rather than a hardcoded format. */
+/* Whole numbers. On the official 40/30/20/10 table every split is already an
+   integer, so decimals would only ever read ".00" on a projector. Precision is
+   a setting in the scoring profile, not a hardcoded format. */
 function fmt(n) {
   return String(Math.round(n));
 }
@@ -249,7 +238,7 @@ class Component extends DCLogic {
 
   reasoningText() {
     const s = this.state;
-    if (s.groups.length === 0) return 'Tap a team to begin. Nothing is sent yet.';
+    if (s.groups.length === 0) return 'Nothing recorded yet.';
 
     let cursor = 1;
     const lines = [];
@@ -262,29 +251,28 @@ class Component extends DCLogic {
       if (group.length > 1) {
         const names = group.map((id) => this.teamById(id).name).join(' and ');
         lines.push(
-          names + ' tied for ' + ORDINALS[cursor - 1] + '. Places ' +
-          slots.map((_, i) => ORDINALS[cursor - 1 + i]).join(' and ') +
-          ' share ' + slots.join(' + ') + ' = ' + sum + ', split ' +
-          group.length + ' ways, ' + fmt(sum / group.length) + ' each.'
+          names + ' tied for ' + ORDINALS[cursor - 1] + ', sharing ' +
+          slots.join(' + ') + ' = ' + sum + ' between ' + group.length +
+          ', so ' + fmt(sum / group.length) + ' each.'
         );
       }
 
       group.forEach((id) => {
         if (s.dq.indexOf(id) >= 0) {
-          lines.push(this.teamById(id).name + ' disqualified. Keeps its place, scores 0, nobody moves up.');
+          lines.push(this.teamById(id).name + ' disqualified, scores 0, nobody moves up.');
         }
       });
 
       cursor += group.length;
     });
 
-    if (s.multiplier !== 1) lines.push('Double round, so placement points are doubled. Bonuses are not.');
+    if (s.multiplier !== 1) lines.push('Double round doubles placement points, not bonuses.');
 
     Object.keys(s.bonus).forEach((id) => {
-      if (s.bonus[id] > 0) lines.push(this.teamById(id).name + ' earned a ' + s.bonus[id] + ' point bonus.');
+      if (s.bonus[id] > 0) lines.push(this.teamById(id).name + ' bonus +' + s.bonus[id] + '.');
     });
 
-    if (lines.length === 0) return 'Clean finish, no ties. Points follow the table directly.';
+    if (lines.length === 0) return 'Clean finish, no ties.';
     return lines.join(' ');
   }
 
@@ -329,15 +317,22 @@ class Component extends DCLogic {
       return {
         name: t.name,
         rank: isPlaced ? String(idx + 1) : '',
-        rankStyle:
-          'min-height: 22px; font-size: 13px; font-weight: 700; opacity: 0.9;' +
-          'display: flex; align-items: center; justify-content: center;' +
-          (isPlaced ? 'width: 22px; border-radius: 999px; background: rgba(255,255,255,0.28);' : ''),
+        /* Placement chip sits in the corner so the team name stays optically
+           centered in the block, placed or not. */
+        rankStyle: isPlaced
+          ? 'position: absolute; top: 9px; right: 9px; width: 24px; height: 24px;' +
+            'border-radius: 999px; background: rgba(255,255,255,0.3);' +
+            'display: flex; align-items: center; justify-content: center;' +
+            'font-size: 13px; font-weight: 700;'
+          : 'display: none;',
         buttonStyle:
-          'height: 128px; border-radius: 20px; display: flex; flex-direction: column;' +
-          'align-items: center; justify-content: center; gap: 6px;' +
+          'position: relative; height: 128px; border-radius: 20px;' +
+          'display: flex; align-items: center; justify-content: center;' +
           'background: ' + t.color + '; color: ' + t.fg + ';' +
-          (isPlaced ? 'opacity: 0.34;' : '') +
+          /* Already placed is shown with an inset ring, not by fading the
+             block. Fading dropped Yellow below readable contrast, and the
+             corner chip already says it has been used. */
+          (isPlaced ? 'box-shadow: inset 0 0 0 5px rgba(255,255,255,0.55);' : '') +
           (s.tieArmed && !isPlaced
             ? 'border: 3px solid oklch(0.145 0 0);'
             : 'border: 3px solid transparent;'),
@@ -392,20 +387,20 @@ class Component extends DCLogic {
             pillStyle:
               'display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 9px;' +
               'font-size: 14px; font-weight: 700; background: ' + t.color + '; color: ' + t.fg + ';' +
-              (isDq ? 'opacity: 0.4; text-decoration: line-through;' : ''),
+              (isDq ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''),
 
-            dqLabel: isDq ? 'Undo DQ' : 'DQ',
+            dqLabel: 'DQ',
             dqStyle: CHIP + (isDq
-              ? 'border: 1px solid oklch(0.577 0.245 27.325); background: oklch(1 0 0); color: oklch(0.577 0.245 27.325);'
-              : 'border: 1px solid transparent; background: color-mix(in oklch, oklch(0.577 0.245 27.325), transparent 91%); color: oklch(0.577 0.245 27.325);'),
+              ? 'border: 1px solid oklch(0.577 0.245 27.325); background: color-mix(in oklch, oklch(0.577 0.245 27.325), transparent 88%); color: oklch(0.577 0.245 27.325); font-weight: 700;'
+              : 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.556 0 0);'),
             dq: () => {
               const next = isDq ? s.dq.filter((x) => x !== id) : s.dq.concat([id]);
               self.commit({ dq: next });
             },
 
-            bonusLabel: bonusValue > 0 ? 'Bonus +' + bonusValue : '+ Bonus',
+            bonusLabel: bonusValue > 0 ? '+' + bonusValue : 'Bonus',
             bonusStyle: CHIP + (bonusValue > 0
-              ? 'border: 1px solid oklch(0.145 0 0); background: oklch(1 0 0); color: oklch(0.145 0 0);'
+              ? 'border: 1px solid oklch(0.145 0 0); background: oklch(1 0 0); color: oklch(0.145 0 0); font-weight: 700;'
               : 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.556 0 0);'),
             bonus: () => {
               const nextIdx = (BONUS_STEPS.indexOf(bonusValue) + 1) % BONUS_STEPS.length;
@@ -414,8 +409,7 @@ class Component extends DCLogic {
               self.commit({ bonus: bonus });
             },
 
-            removeLabel: 'Remove',
-            removeStyle: CHIP + 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.556 0 0);',
+            removeStyle: ICON_CHIP + 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.556 0 0);',
             remove: () => {
               const groups = s.groups
                 .map((g) => g.filter((x) => x !== id))
@@ -434,11 +428,11 @@ class Component extends DCLogic {
 
       return {
         dotStyle:
-          'width: 24px; height: 8px; border-radius: 999px; display: block; background: ' + t.color + ';' +
+          'width: 26px; height: 8px; border-radius: 999px; display: block; background: ' + t.color + ';' +
           (has ? '' : 'opacity: 0.28;'),
         value: has ? fmt(awards[t.id]) : '—',
         valueStyle:
-          'font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums;' +
+          'font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;' +
           (has ? 'color: oklch(0.145 0 0);' : 'color: oklch(0.556 0 0); font-weight: 500;'),
       };
     });
@@ -455,32 +449,24 @@ class Component extends DCLogic {
       setX1: () => self.commit({ multiplier: 1 }),
       setX2: () => self.commit({ multiplier: 2 }),
 
-      tapLabel: s.tieArmed ? 'Tap every team that tied' : 'Tap in finish order',
+      tapLabel: s.tieArmed ? 'Tap teams that tied' : 'Tap in finish order',
       tapLabelStyle:
         'font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;' +
         (s.tieArmed ? 'color: oklch(0.145 0 0);' : 'color: oklch(0.556 0 0);'),
       tieArmLabel: s.tieArmed ? 'Done' : 'Tie',
       tieArmStyle:
-        'height: 32px; padding: 0 12px; border-radius: 10px; font-size: 13px; font-weight: 600;' +
-        'display: inline-flex; align-items: center; gap: 5px;' +
+        'height: 36px; padding: 0 12px; border-radius: 11px; font-size: 13px; font-weight: 600;' +
+        'display: inline-flex; align-items: center; gap: 6px;' +
         (s.tieArmed
           ? 'border: 1px solid oklch(0.145 0 0); background: oklch(0.205 0 0); color: oklch(0.985 0 0);'
           : 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.371 0 0);'),
       toggleTie: () => self.setState({ tieArmed: !s.tieArmed, tieInto: null }),
 
-      clearStyle:
-        'height: 30px; padding: 0 10px; border-radius: 9px; border: none; background: none; font-size: 13px; font-weight: 500;' +
-        (s.groups.length > 0 ? 'color: oklch(0.556 0 0);' : 'color: oklch(0.922 0 0); cursor: default;'),
-      clear: () => {
-        if (s.groups.length === 0) return;
-        self.commit({ groups: [], dq: [], bonus: {}, tieInto: null, tieArmed: false });
-      },
-
       undoStyle:
-        'height: 48px; padding: 0 15px; border-radius: 13px; font-size: 15px; font-weight: 600;' +
-        'display: flex; align-items: center; gap: 7px;' +
+        'height: 36px; padding: 0 12px; border-radius: 11px; font-size: 13px; font-weight: 600;' +
+        'display: inline-flex; align-items: center; gap: 6px;' +
         (canUndo
-          ? 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.145 0 0);'
+          ? 'border: 1px solid oklch(0.922 0 0); background: oklch(1 0 0); color: oklch(0.371 0 0);'
           : 'border: 1px solid oklch(0.97 0 0); background: oklch(1 0 0); color: oklch(0.922 0 0); cursor: default;'),
       undo: () => {
         if (!canUndo) return;
@@ -492,16 +478,22 @@ class Component extends DCLogic {
         });
       },
 
+      clearStyle:
+        'height: 30px; padding: 0 10px; border-radius: 9px; border: none; background: none; font-size: 13px; font-weight: 500;' +
+        (s.groups.length > 0 ? 'color: oklch(0.556 0 0);' : 'color: oklch(0.922 0 0); cursor: default;'),
+      clear: () => {
+        if (s.groups.length === 0) return;
+        self.commit({ groups: [], dq: [], bonus: {}, tieInto: null, tieArmed: false });
+      },
+
       confirmLabel: blocking ? blocking : 'Confirm round',
       confirmStyle:
-        'flex-grow: 1; height: 48px; border-radius: 13px; border: none; font-size: 16px; font-weight: 700;' +
+        'width: 100%; height: 50px; border-radius: 13px; border: none; font-size: 16px; font-weight: 700;' +
         (blocking
           ? 'background: oklch(0.97 0 0); color: oklch(0.556 0 0); cursor: not-allowed;'
           : 'background: oklch(0.205 0 0); color: oklch(0.985 0 0);'),
 
-      footnote: blocking
-        ? 'Every team needs a place before this round can be sent.'
-        : 'Nothing reaches the board until you confirm.',
+      footnote: 'Nothing reaches the board until you confirm.',
     };
   }
 }
