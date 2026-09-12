@@ -1,0 +1,35 @@
+# Local development database only.
+#
+# The API and the web app run natively rather than in containers, because the
+# fast edit-and-reload loop matters more during a three week build than
+# environment parity. Parity is covered by the Dockerfile and the deploy.
+#
+#   docker compose up -d      start Postgres
+#   docker compose down       stop it, keeping data
+#   docker compose down -v    stop it and delete the data volume
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: awana-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: awana
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: awana
+    ports:
+      # 5433 on the host, not 5432, so this can run at the same time as the
+      # Postgres another project on this machine already uses.
+      - "5433:5432"
+    volumes:
+      - awana-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Compose reports the container healthy only once Postgres actually
+      # accepts connections, which is several seconds after the port opens.
+      test: ["CMD-SHELL", "pg_isready -U awana -d awana"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  awana-pgdata:

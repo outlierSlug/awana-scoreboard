@@ -1,7 +1,11 @@
 # ---- Secrets and local config (the v1 draft committed both .env and dev.db) ----
 .env
 .env.*
+# Non-secret, needed by every developer, so these two are tracked.
 !.env.example
+!.env.development
+# Personal overrides stay untracked. Listed last, because the final match wins.
+.env.*.local
 appsettings.*.local.json
 *.local.json
 secrets.json

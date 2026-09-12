@@ -1,0 +1,60 @@
+/*
+  The single declaration site for design tokens.
+
+  In Tailwind v4 an @theme entry is both a CSS custom property and a utility
+  class, so --color-team-red is usable as bg-team-red and as
+  var(--color-team-red). One value, one place, greppable.
+
+  IMPORTANT, about the team colors below.
+
+  These are SEED values only. They are what the database seeder writes into
+  Team.ColorHex and what the admin colour picker offers as defaults. At render
+  time the authoritative colour comes from the API, because tenants configure
+  their own. So a team row is styled from an inline custom property fed by the
+  server, never from a bg-team-red class:
+
+    <div style={{ '--team': team.colorHex, '--team-fg': team.textOnColorHex }}
+         className="bg-[var(--team)] text-[var(--team-fg)]">
+
+  Getting that backwards is how the colour list ends up hardcoded in
+  components again, which is where the v1 draft went wrong.
+
+  Each team carries an explicit foreground colour. Text is never rendered in
+  the team colour itself, because yellow on a dark board is unreadable and
+  yellow is one of the four teams.
+*/
+
+@theme {
+  /* Team seed colours. Every pairing below clears 4.5:1 against its
+     foreground, so they stay legible in the dense app UI as well as on the
+     board where the type is enormous. */
+  --color-team-red: #dc2626;
+  --color-team-red-fg: #ffffff;
+
+  --color-team-blue: #2563eb;
+  --color-team-blue-fg: #ffffff;
+
+  --color-team-yellow: #facc15;
+  --color-team-yellow-fg: #111827;
+
+  --color-team-green: #15803d;
+  --color-team-green-fg: #ffffff;
+
+  /* The board surface. Dark, because it is projected in a lit gym and a white
+     background at that size is painful to look at for ninety minutes. */
+  --color-board-bg: #0b0f14;
+  --color-board-fg: #f8fafc;
+  --color-board-muted: #94a3b8;
+
+  /* The app surface, used by the scorekeeper console and admin screens. */
+  --color-app-bg: #f8fafc;
+  --color-app-fg: #0f172a;
+  --color-app-muted: #64748b;
+  --color-app-border: #e2e8f0;
+
+  /* Connection status, shown on the board so that silent staleness is
+     impossible. Green connected, amber reconnecting, red offline. */
+  --color-status-live: #22c55e;
+  --color-status-retry: #f59e0b;
+  --color-status-down: #ef4444;
+}

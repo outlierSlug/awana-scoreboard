@@ -15,7 +15,32 @@ if (!string.IsNullOrWhiteSpace(port))
     builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 }
 
+// The browser app is served from a different origin than the API, in every
+// environment, so CORS is always required.
+//
+// The origin list is configuration, never a wildcard. AllowAnyOrigin cannot be
+// combined with AllowCredentials, and a wildcard plus credentials is the
+// standard way to accidentally expose an authenticated API to any site the
+// user happens to be visiting.
+const string WebCorsPolicy = "web";
+
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(WebCorsPolicy, policy => policy
+        .WithOrigins(allowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        // Needed so the browser will send the auth cookie on API calls.
+        .AllowCredentials());
+});
+
 var app = builder.Build();
+
+app.UseCors(WebCorsPolicy);
 
 // Render polls this to decide whether a deploy succeeded and whether the
 // instance is still alive. It must stay cheap and must not touch the database,
