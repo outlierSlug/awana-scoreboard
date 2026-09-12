@@ -60,9 +60,14 @@ After a relay finished, the finisher could take a beanbag and throw it at a
 bucket in the middle of the center circle. Landing it earned the team **20
 points**. Any team could earn it, including one that had just come last.
 
-This is a per team, per round bonus of a fixed amount. The engine models it
-directly as `TeamEntry.Bonus`, and bonuses are added after any round multiplier,
-so a double round does not turn a 20 point bucket into 40.
+This is a per team, per round bonus. The engine models it directly as
+`TeamEntry.Bonus`, and bonuses are added after any round multiplier, so a double
+round does not turn a 20 point bucket into 40.
+
+**The amount is entered per round, not fixed.** The archive suggests the bonus
+was sometimes 10 and sometimes 20, and a future game will award something else
+again. So the scorekeeper console gets a number field defaulting to 20, not a
+checkbox that hardcodes it.
 
 ## Teams
 

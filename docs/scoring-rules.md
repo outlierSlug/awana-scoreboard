@@ -57,6 +57,31 @@ Three other tie rules are available as configuration:
 | `LowestSlot` | Every tied team gets the worst slot's value. |
 | `NoTiesAllowed` | The round is rejected and the scorekeeper must break the tie. |
 
+### Why averaging is the default
+
+Each round is a fixed pot. Slots 1 through 4 are worth 100 points between them,
+and placement decides how that pot is divided. A tie means the teams could not be
+separated, so the fair answer is to split what those positions were worth.
+
+Awarding both tied teams the higher value invents points nobody earned, and it
+makes a night with more close finishes worth more in total than a night without.
+Season standings would then depend partly on how close the races happened to be,
+which no team controls.
+
+Averaging is also the only rule that can be checked by the kids asking about it.
+"Places 1 and 2 are worth 40 plus 30, which is 70, split two ways, so 35 each"
+is arithmetic anyone can follow. "You both get 40" has no reasoning to appeal to.
+
+The objection that comes up is that 35 feels like a penalty for tying, since an
+outright win pays 40. Two answers. `LowestSlot` is the punitive rule, where both
+teams get 30, so averaging is the neutral middle. And a tie for first still pays
+35, which beats the 30 that second place would have paid, so tying is never worse
+than losing.
+
+The rule stays configurable because other churches score differently, and because
+each session freezes its scoring profile at the moment it starts. Changing the
+default later cannot alter a result that has already been recorded.
+
 ## Disqualification
 
 The default rule is **zero, but hold the slot**.
