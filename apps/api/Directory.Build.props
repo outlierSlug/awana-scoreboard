@@ -1,0 +1,21 @@
+<Project>
+
+  <!--
+    Shared build settings for every project in the solution. Declared once here so
+    the individual csproj files only carry what is genuinely specific to them.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- A nullability warning in the scoring engine is a scoring bug. Fail the build. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Not a library, so no NuGet packaging or XML docs. -->
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

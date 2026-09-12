@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Awana.Api/Awana.Api.csproj" />
+    <Project Path="src/Awana.Data/Awana.Data.csproj" />
+    <Project Path="src/Awana.Scoring/Awana.Scoring.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Awana.Api.Tests/Awana.Api.Tests.csproj" />
+    <Project Path="tests/Awana.Scoring.Tests/Awana.Scoring.Tests.csproj" />
+  </Folder>
+</Solution>

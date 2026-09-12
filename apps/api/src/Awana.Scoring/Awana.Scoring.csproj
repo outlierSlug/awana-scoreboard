@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    This project is deliberately pure. It has no PackageReference and no
+    ProjectReference, and it must stay that way.
+
+    The scoring rules are the part of this product that has to be provably
+    correct, so they are kept independent of EF Core, ASP.NET, and the database.
+    That is what lets the whole rule set be tested without a server or a
+    connection string. CI enforces the rule, see .github/workflows/ci.yml.
+
+    If you find yourself wanting to reference something here, the dependency
+    almost certainly belongs in Awana.Data or Awana.Api instead.
+  -->
+
+</Project>

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <!--
+      The API speaks JSON and ISO-8601 only, and all presentation formatting
+      happens in the browser. Running invariant keeps the container smaller and
+      removes a class of "formats differently on the server than locally" bug.
+    -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Awana.Data\Awana.Data.csproj" />
+    <ProjectReference Include="..\Awana.Scoring\Awana.Scoring.csproj" />
+  </ItemGroup>
+
+</Project>
