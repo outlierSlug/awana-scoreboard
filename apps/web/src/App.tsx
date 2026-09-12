@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
-import { config } from './config'
+import { useCallback, useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { config } from '@/config'
 
 interface Health {
   status: string
@@ -22,10 +24,19 @@ const PLACEHOLDER_TEAMS = [
   { name: 'Green', color: 'var(--color-team-green)', textOnColor: 'var(--color-team-green-fg)' },
 ]
 
-type Status = { state: 'loading' } | { state: 'ok'; health: Health } | { state: 'error'; message: string }
+type Status =
+  | { state: 'loading' }
+  | { state: 'ok'; health: Health }
+  | { state: 'error'; message: string }
 
 export default function App() {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
+  const [attempt, setAttempt] = useState(0)
+
+  const retry = useCallback(() => {
+    setStatus({ state: 'loading' })
+    setAttempt((n) => n + 1)
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -40,28 +51,34 @@ export default function App() {
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
-        setStatus({ state: 'error', message: error instanceof Error ? error.message : String(error) })
+        setStatus({
+          state: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        })
       })
 
-    return () => { controller.abort() }
-  }, [])
+    return () => {
+      controller.abort()
+    }
+  }, [attempt])
 
   return (
-    <main className="min-h-dvh bg-app-bg px-4 py-10 text-app-fg">
+    <main className="min-h-dvh bg-background px-4 py-10 text-foreground">
       <div className="mx-auto flex max-w-2xl flex-col gap-8">
         <header>
           <h1 className="text-2xl font-semibold">Awana Scoreboard</h1>
-          <p className="mt-1 text-sm text-app-muted">
+          <p className="mt-1 text-sm text-muted-foreground">
             Scaffold check. Nothing here is the real product yet.
           </p>
         </header>
 
-        <section className="rounded-lg border border-app-border bg-white p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-app-muted">
-            API connection
-          </h2>
-          <div className="mt-3 text-sm">
-            {status.state === 'loading' && <p>Checking {config.apiBaseUrl}...</p>}
+        <Card>
+          <CardHeader>
+            <CardTitle>API connection</CardTitle>
+            <CardDescription>{config.apiBaseUrl}</CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm">
+            {status.state === 'loading' && <p className="text-muted-foreground">Checking...</p>}
 
             {status.state === 'ok' && (
               <div className="flex items-start gap-3">
@@ -72,7 +89,7 @@ export default function App() {
                 />
                 <div>
                   <p className="font-medium">Connected to {status.health.service}</p>
-                  <p className="text-app-muted">Server time {status.health.utc}</p>
+                  <p className="text-muted-foreground">Server time {status.health.utc}</p>
                 </div>
               </div>
             )}
@@ -84,20 +101,28 @@ export default function App() {
                   style={{ background: 'var(--color-status-down)' }}
                   aria-hidden
                 />
-                <div>
-                  <p className="font-medium">Could not reach {config.apiBaseUrl}</p>
-                  <p className="text-app-muted">{status.message}</p>
-                  <p className="mt-1 text-app-muted">
-                    Start it with <code>dotnet run --project apps/api/src/Awana.Api</code>
-                  </p>
+                <div className="flex flex-col items-start gap-3">
+                  <div>
+                    <p className="font-medium">Could not reach the API</p>
+                    <p className="text-muted-foreground">{status.message}</p>
+                    <p className="mt-1 text-muted-foreground">
+                      Start it with{' '}
+                      <code className="rounded bg-muted px-1 py-0.5">
+                        dotnet run --project apps/api/src/Awana.Api
+                      </code>
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={retry}>
+                    Retry
+                  </Button>
                 </div>
               </div>
             )}
-          </div>
-        </section>
+          </CardContent>
+        </Card>
 
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-app-muted">
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Team colour tokens
           </h2>
           <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">

@@ -8,6 +8,19 @@
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
+    /* Not on by default in the Vite template. Turned on because the whole
+       point of TypeScript here is catching a null team or an undefined score
+       before it reaches a projector. */
+    "strict": true,
+
+    /* shadcn/ui generates imports like "@/components/ui/button", and the
+       alias keeps feature code from accumulating ../../.. chains.
+       No baseUrl: it is deprecated in TypeScript 6, and since 5.0 paths
+       resolve relative to this file anyway. */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

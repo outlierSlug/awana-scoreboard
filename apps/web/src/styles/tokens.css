@@ -46,11 +46,13 @@
   --color-board-fg: #f8fafc;
   --color-board-muted: #94a3b8;
 
-  /* The app surface, used by the scorekeeper console and admin screens. */
-  --color-app-bg: #f8fafc;
-  --color-app-fg: #0f172a;
-  --color-app-muted: #64748b;
-  --color-app-border: #e2e8f0;
+  /* NOTE: the app and admin surface is NOT defined here.
+     shadcn/ui owns --background, --foreground, --muted-foreground, --border,
+     --card and friends, declared in index.css. Defining a parallel set here
+     would recreate the exact drift this file exists to prevent, so app
+     surfaces use bg-background and text-muted-foreground, and this file
+     covers only what shadcn has no concept of: teams, the board, and
+     connection state. */
 
   /* Connection status, shown on the board so that silent staleness is
      impossible. Green connected, amber reconnecting, red offline. */

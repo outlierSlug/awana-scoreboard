@@ -1,3 +1,4 @@
+import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
@@ -5,6 +6,13 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    // Mirrors the "@/*" path in tsconfig.app.json. Both are needed: TypeScript
+    // uses its copy to type check, Vite uses this one to actually resolve.
+    alias: {
+      '@': path.resolve(import.meta.dirname, './src'),
+    },
+  },
   server: {
     // 5200 for the web app and 5201 for the API. Both stay on http locally,
     // and that is deliberate: browsers treat http and https as different
