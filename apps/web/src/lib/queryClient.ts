@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import { ApiError } from './apiClient'
 
 /**
@@ -16,7 +16,30 @@ export const queryKeys = {
   games: (divisionId?: string) => ['games', divisionId ?? 'all'] as const,
 }
 
+/**
+ * A session that has run out, handled once.
+ *
+ * The cookie lasts fourteen days and slides, so this is rare, but when it does
+ * happen it happens mid round: every panel starts answering 401 and the console
+ * fills with errors that all mean the same thing. Sending the scorekeeper to
+ * sign in again is the only useful response, and it has to be the whole app's
+ * response rather than each caller's.
+ *
+ * Only from inside the console. The board and the landing page call public
+ * endpoints that never answer 401, and a redirect to sign-in on a screen
+ * showing scores to a room would be the wrong answer to any error at all.
+ */
+function onExpiredSession(error: unknown) {
+  if (!(error instanceof ApiError) || error.status !== 401) return
+  if (!window.location.pathname.startsWith('/app')) return
+
+  queryClient.clear()
+  window.location.href = '/login'
+}
+
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: onExpiredSession }),
+  mutationCache: new MutationCache({ onError: onExpiredSession }),
   defaultOptions: {
     queries: {
       // The board holds a live connection, so polling is a fallback rather than

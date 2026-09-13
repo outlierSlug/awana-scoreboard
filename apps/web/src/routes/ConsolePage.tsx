@@ -9,9 +9,16 @@ import { SessionStatusLabel } from '@/components/SessionStatusLabel'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
+import { useMe } from '@/lib/auth'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
-import { SessionStatus, type RoundSummary, type Scoreboard, type SessionDetail } from '@/lib/types'
+import {
+  SessionStatus,
+  UserRole,
+  type RoundSummary,
+  type Scoreboard,
+  type SessionDetail,
+} from '@/lib/types'
 import { formatDate } from '@/lib/format'
 
 export function ConsolePage() {
@@ -27,6 +34,13 @@ export function ConsolePage() {
   // a team block steps back and stops answering until the tie is closed, so
   // the one thing left to do is the only thing that looks live.
   const [tieArmed, setTieArmed] = useState(false)
+
+  // Each of these matches a policy on the endpoint behind it. The server is
+  // still the gate; this is so nobody is offered a button that cannot work.
+  const { can } = useMe()
+  const canScore = can(UserRole.Scorekeeper)
+  const canRunSession = can(UserRole.GamesLeader)
+  const canReopen = can(UserRole.Admin)
   const recede = tieArmed
     ? 'pointer-events-none opacity-40 transition-opacity duration-200'
     : 'transition-opacity duration-200'
@@ -131,21 +145,21 @@ export function ConsolePage() {
               </Button>
             )}
 
-            {data.status === SessionStatus.Setup && (
+            {data.status === SessionStatus.Setup && canRunSession && (
               <Button size="lg" disabled={pending} onClick={() => start.mutate()}>
                 <Play />
                 {start.isPending ? 'Starting...' : 'Start session'}
               </Button>
             )}
 
-            {data.status === SessionStatus.Running && (
+            {data.status === SessionStatus.Running && canRunSession && (
               <Button variant="outline" size="lg" disabled={pending} onClick={() => setFinishing(true)}>
                 <Flag />
                 Finish
               </Button>
             )}
 
-            {data.status === SessionStatus.Finished && (
+            {data.status === SessionStatus.Finished && canReopen && (
               <Button variant="outline" size="lg" disabled={pending} onClick={() => reopen.mutate()}>
                 <RotateCcw />
                 Reopen
@@ -171,7 +185,19 @@ export function ConsolePage() {
         </div>
       )}
 
-      {data.status === SessionStatus.Running && (
+      {/* Signed in, but not to do this. Without saying so the page is just
+          empty between the header and the rounds, which reads as broken. */}
+      {data.status === SessionStatus.Running && !canScore && (
+        <div className="rounded-xl border border-dashed p-5">
+          <p className="font-medium">Watching, not recording.</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            Recording rounds needs the scorekeeper role. Ask an admin to change yours, then sign
+            out and back in for it to take effect.
+          </p>
+        </div>
+      )}
+
+      {data.status === SessionStatus.Running && canScore && (
         <RoundEntry
           session={data}
           // The dialog on top gets the keyboard while it is open.
@@ -221,7 +247,7 @@ export function ConsolePage() {
         <RoundHistory
           rounds={data.rounds}
           teams={data.teams}
-          editable={data.status === SessionStatus.Running}
+          editable={data.status === SessionStatus.Running && canScore}
           busy={roundPending}
           onClear={(round, reason) => clearRound.mutate({ round, reason })}
           onEdit={(round, label) => setEditing({ round, label })}

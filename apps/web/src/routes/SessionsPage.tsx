@@ -5,15 +5,21 @@ import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useMe } from '@/lib/auth'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
-import { SessionStatus, type Division, type SessionSummary } from '@/lib/types'
+import { SessionStatus, UserRole, type Division, type SessionSummary } from '@/lib/types'
 import { SessionStatusLabel } from '@/components/SessionStatusLabel'
 import { formatDate } from '@/lib/format'
 
 export function SessionsPage() {
   const queryClient = useQueryClient()
   const [creating, setCreating] = useState(false)
+
+  // The API refuses these regardless. Hiding them keeps a scorekeeper from
+  // filling in a form whose only possible ending is a permission error.
+  const { can } = useMe()
+  const canCreate = can(UserRole.GamesLeader)
 
   const sessions = useQuery<SessionSummary[]>({
     queryKey: queryKeys.sessions(),
@@ -45,13 +51,15 @@ export function SessionsPage() {
           </p>
         </div>
 
-        <Button size="lg" onClick={() => setCreating((open) => !open)}>
-          <CalendarPlus />
-          New session
-        </Button>
+        {canCreate && (
+          <Button size="lg" onClick={() => setCreating((open) => !open)}>
+            <CalendarPlus />
+            New session
+          </Button>
+        )}
       </div>
 
-      {creating && divisions.data && (
+      {creating && canCreate && divisions.data && (
         <NewSessionForm
           divisions={divisions.data}
           pending={create.isPending}
