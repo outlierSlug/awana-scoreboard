@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ExternalLink, Play, RotateCcw, Square } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Flag, Play, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { RoundEntry } from '@/components/round/RoundEntry'
 import { RoundHistory } from '@/components/round/RoundHistory'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
@@ -18,6 +19,7 @@ export function ConsolePage() {
   // The round open in the correction dialog. It is saved over in place when
   // the dialog is submitted, and closing the dialog changes nothing.
   const [editing, setEditing] = useState<{ round: RoundSummary; label: string } | null>(null)
+  const [finishing, setFinishing] = useState(false)
 
   const session = useQuery<SessionDetail>({
     queryKey: queryKeys.session(id ?? ''),
@@ -37,7 +39,13 @@ export function ConsolePage() {
   })
 
   const start = useMutation({ mutationFn: () => api.startSession(id!), onSuccess: refresh })
-  const finish = useMutation({ mutationFn: () => api.finishSession(id!), onSuccess: refresh })
+  const finish = useMutation({
+    mutationFn: () => api.finishSession(id!),
+    onSuccess: async () => {
+      setFinishing(false)
+      await refresh()
+    },
+  })
   const reopen = useMutation({ mutationFn: () => api.reopenSession(id!), onSuccess: refresh })
 
   if (session.isPending) {
@@ -80,8 +88,6 @@ export function ConsolePage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(data.date)} · {liveRounds.length}{' '}
               {liveRounds.length === 1 ? 'round' : 'rounds'} recorded
-              {data.rounds.length !== liveRounds.length &&
-                `, ${data.rounds.length - liveRounds.length} cleared`}
             </p>
           </div>
 
@@ -103,8 +109,8 @@ export function ConsolePage() {
             )}
 
             {data.status === SessionStatus.Running && (
-              <Button variant="outline" size="lg" disabled={pending} onClick={() => finish.mutate()}>
-                <Square />
+              <Button variant="outline" size="lg" disabled={pending} onClick={() => setFinishing(true)}>
+                <Flag />
                 Finish
               </Button>
             )}
@@ -173,6 +179,20 @@ export function ConsolePage() {
         onClear={(round, reason) => clearRound.mutate({ round, reason })}
         onEdit={(round, label) => setEditing({ round, label })}
       />
+
+      <ConfirmDialog
+        open={finishing}
+        title="Finish this session?"
+        confirmLabel="Finish session"
+        busy={finish.isPending}
+        onCancel={() => setFinishing(false)}
+        onConfirm={() => finish.mutate()}
+      >
+        <p>
+          The board stops taking rounds and shows tonight&rsquo;s final standings. You can reopen
+          the session afterwards if there is another round to play.
+        </p>
+      </ConfirmDialog>
 
       <Modal
         open={editing !== null}

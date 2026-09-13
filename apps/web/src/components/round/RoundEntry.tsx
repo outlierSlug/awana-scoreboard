@@ -243,16 +243,20 @@ export function RoundEntry({
   const pointsFor = new Map(preview.data?.awards.map((a) => [a.teamId, a.points]) ?? [])
   const slots = startSlots(draft)
 
-  // Highest first, which is the order the board will show and therefore the
-  // order the scorekeeper is checking against.
-  const standingsPreview = [...session.teams].sort(
-    (a, b) => (pointsFor.get(b.teamId) ?? -1) - (pointsFor.get(a.teamId) ?? -1),
-  )
+  // Why the points cannot be shown, when that is the case.
+  const previewProblem =
+    preview.error instanceof ApiError
+      ? `Points unavailable: ${preview.error.message}`
+      : preview.error
+        ? 'Points unavailable. Check the connection.'
+        : preview.data?.isValid === false
+          ? preview.data.errors.map((e) => e.message).join(' ')
+          : null
 
   const gameName = games.data?.find((game) => game.id === draft.gameId)?.name ?? 'this game'
 
   return (
-    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
       {editingLabel && (
         <h2 className="text-lg font-bold tracking-tight lg:col-span-2">
           Editing {editingLabel}
@@ -324,17 +328,31 @@ export function RoundEntry({
             </Button>
           </div>
         </div>
+      </div>
 
-        {draft.groups.length > 0 && (
-          <div>
-            <span className="mb-2.5 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      {/* Finish order and its points, next to the button that sends them. They
+          were two panels asking the same question, and the row already carries
+          what each team would score. */}
+      <div className="mx-auto flex w-full max-w-md flex-col gap-3 lg:sticky lg:top-20 lg:max-w-none">
+        <div className="rounded-xl border p-4">
+          <div className="mb-3 flex items-baseline justify-between">
+            <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Finish order
             </span>
+            {preview.isFetching && (
+              <span className="text-xs text-muted-foreground">Checking...</span>
+            )}
+          </div>
 
-            <ul className="flex flex-col gap-2">
+          {draft.groups.length === 0 ? (
+            <p className="py-2 text-center text-sm text-muted-foreground">
+              {draft.gameId ? 'Tap a team to start.' : 'Choose a game to start.'}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2.5">
               {draft.groups.map((group, index) => (
-                <li key={group.join('-')} className="rounded-xl border p-3">
-                  <div className="mb-2 flex items-center gap-2">
+                <li key={group.join('-')}>
+                  <div className="mb-1.5 flex items-center gap-2">
                     <span className="text-sm font-bold">{ordinal(slots[index])}</span>
                     {group.length > 1 && (
                       <span className="text-xs text-muted-foreground">
@@ -360,17 +378,14 @@ export function RoundEntry({
                 </li>
               ))}
             </ul>
-          </div>
-        )}
-      </div>
+          )}
 
-      <div className="mx-auto flex w-full max-w-md flex-col gap-3 lg:sticky lg:top-20 lg:max-w-none">
-        <PreviewPanel
-          teams={standingsPreview}
-          preview={preview.data}
-          error={preview.error}
-          isPending={preview.isFetching}
-        />
+          {previewProblem && (
+            <p className="mt-3 border-t pt-3 text-xs leading-relaxed text-destructive">
+              {previewProblem}
+            </p>
+          )}
+        </div>
 
         {record.error instanceof ApiError && (
           <p className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
@@ -579,14 +594,13 @@ function TeamBlock({
         // yellow below readable contrast.
         background: placed ? `color-mix(in oklch, ${team.colorHex}, white 62%)` : team.colorHex,
         color: placed ? 'oklch(0.145 0 0)' : team.textOnColorHex,
-        // Marks which blocks a tie can still take. Drawn INSIDE the block, in
-        // the team's own text color: an outline on the edge disappears against
-        // whichever page background happens to be behind it, which is how a
-        // black one went missing in the dark theme.
+        // Marks which blocks a tie can still take. Drawn INSIDE the block, so
+        // it does not disappear against whichever page background happens to be
+        // behind it, which is how a black outline went missing in the dark
+        // theme. White on every team rather than each team's own text color, so
+        // the four read as one signal instead of four different ones.
         boxShadow:
-          arming && !placed
-            ? `inset 0 0 0 5px ${team.colorHex}, inset 0 0 0 10px ${team.textOnColorHex}`
-            : undefined,
+          arming && !placed ? `inset 0 0 0 5px ${team.colorHex}, inset 0 0 0 10px white` : undefined,
       }}
     >
       {team.name}
@@ -622,43 +636,47 @@ function TeamLine({
   dispatch: React.Dispatch<DraftAction>
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span
-        className="inline-flex h-8 min-w-18 items-center justify-center rounded-lg px-2.5 text-sm font-bold"
-        style={{
-          background: team?.colorHex,
-          color: team?.textOnColorHex,
-          textDecoration: dq ? 'line-through' : undefined,
-          textDecorationThickness: dq ? '2px' : undefined,
-        }}
-      >
-        {team?.name ?? 'Unknown'}
-      </span>
+    <div className="flex items-center gap-1.5">
+      {/* The controls wrap among themselves on a narrow phone. The points stay
+          pinned to the first line, where the eye is already looking. */}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        <span
+          className="inline-flex h-8 min-w-18 items-center justify-center rounded-lg px-2.5 text-sm font-bold"
+          style={{
+            background: team?.colorHex,
+            color: team?.textOnColorHex,
+            textDecoration: dq ? 'line-through' : undefined,
+            textDecorationThickness: dq ? '2px' : undefined,
+          }}
+        >
+          {team?.name ?? 'Unknown'}
+        </span>
 
-      {/* Covers a rule break and a team that never finished alike: the slot is
-          kept, nothing is scored, and nobody behind moves up. */}
-      <Toggle on={dq} disabled={disabled} onClick={() => dispatch({ type: 'toggleDq', teamId })}>
-        DQ
-      </Toggle>
+        {/* Covers a rule break and a team that never finished alike: the slot
+            is kept, nothing is scored, and nobody behind moves up. */}
+        <Toggle on={dq} disabled={disabled} onClick={() => dispatch({ type: 'toggleDq', teamId })}>
+          DQ
+        </Toggle>
 
-      <BonusControl
-        value={bonus}
-        disabled={disabled}
-        onChange={(points) => dispatch({ type: 'setBonus', teamId, points })}
-      />
+        <BonusControl
+          value={bonus}
+          disabled={disabled}
+          onChange={(points) => dispatch({ type: 'setBonus', teamId, points })}
+        />
 
-      <button
-        type="button"
-        disabled={disabled}
-        aria-label="Remove from the round"
-        title="Remove from the round"
-        onClick={() => dispatch({ type: 'remove', teamId })}
-        className="flex size-8 items-center justify-center rounded-lg border text-muted-foreground hover:bg-muted disabled:opacity-40"
-      >
-        <X className="size-3.5" />
-      </button>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="Remove from the round"
+          title="Remove from the round"
+          onClick={() => dispatch({ type: 'remove', teamId })}
+          className="flex size-8 items-center justify-center rounded-lg border text-muted-foreground hover:bg-muted disabled:opacity-40"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
 
-      <span className="ml-auto text-base font-bold tabular-nums">
+      <span className="shrink-0 text-base font-bold tabular-nums">
         {points === undefined ? '' : Math.round(points)}
       </span>
     </div>
@@ -751,68 +769,5 @@ function Toggle({
     >
       {children}
     </button>
-  )
-}
-
-function PreviewPanel({
-  teams,
-  preview,
-  error,
-  isPending,
-}: {
-  /** Already ordered by what this round would score. */
-  teams: SessionTeam[]
-  preview: Preview | undefined
-  error: unknown
-  isPending: boolean
-}) {
-  const byTeam = new Map(preview?.awards.map((a) => [a.teamId, a]) ?? [])
-
-  const problem =
-    error instanceof ApiError
-      ? `Points unavailable: ${error.message}`
-      : error
-        ? 'Points unavailable. Check the connection.'
-        : preview?.isValid === false
-          ? preview.errors.map((e) => e.message).join(' ')
-          : null
-
-  return (
-    <div className="rounded-xl border p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          Points if confirmed
-        </span>
-        {isPending && <span className="text-xs text-muted-foreground">Checking...</span>}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        {teams.map((team) => {
-          const award = byTeam.get(team.teamId)
-          return (
-            <div key={team.teamId} className="flex items-center gap-2.5">
-              <span
-                className="size-2.5 shrink-0 rounded-sm"
-                style={{ background: team.colorHex, opacity: award ? 1 : 0.3 }}
-                aria-hidden
-              />
-              <span className="flex-1 text-sm font-medium">{team.name}</span>
-              <span
-                className={[
-                  'font-bold tabular-nums',
-                  award ? 'text-base' : 'text-sm font-medium text-muted-foreground',
-                ].join(' ')}
-              >
-                {award ? Math.round(award.points) : '0'}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-
-      {problem && (
-        <p className="mt-3 border-t pt-3 text-xs leading-relaxed text-destructive">{problem}</p>
-      )}
-    </div>
   )
 }

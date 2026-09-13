@@ -27,6 +27,10 @@ export function RoundHistory({
 }) {
   const [clearing, setClearing] = useState<{ round: RoundSummary; label: string } | null>(null)
 
+  // Cleared rounds are left out entirely: one is a mistake being taken back,
+  // and listing it only invites a question about the numbering. It stays in
+  // the database either way.
+  //
   // Numbered by position rather than by the stored round number. Clearing a
   // round in the middle of the night leaves a hole in the stored numbering,
   // and "round 3, round 5, round 6" invites a question nobody can answer from
@@ -35,8 +39,6 @@ export function RoundHistory({
     .filter((round) => !round.isVoided)
     .sort((a, b) => a.roundNumber - b.roundNumber)
     .map((round, index) => ({ round, label: `Round ${index + 1}` }))
-
-  const cleared = rounds.length - live.length
 
   return (
     <section>
@@ -101,15 +103,6 @@ export function RoundHistory({
             </li>
           ))}
         </ul>
-      )}
-
-      {cleared > 0 && (
-        // Not listed. A cleared round is a mistake being taken back, and
-        // leaving it on screen struck through only invites the numbering
-        // question again. It stays in the database either way.
-        <p className="mt-2 text-xs text-muted-foreground">
-          {cleared} cleared {cleared === 1 ? 'round is' : 'rounds are'} not shown.
-        </p>
       )}
 
       <ConfirmDialog
