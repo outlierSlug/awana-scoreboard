@@ -1,0 +1,240 @@
+/*
+  The public scoreboard.
+
+  Everything is sized in vh, so the same markup fills a 16:9 TV, a 16:10 laptop
+  driving a projector, and an older 4:3 projector without clipping. Nothing
+  scrolls at any shape. Below 640px it becomes cards, which is a different
+  problem: a phone is read at arm's length, not from thirty feet.
+*/
+
+.board {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: 11vh 1fr 6vh;
+  background: var(--color-board-bg);
+  color: var(--color-board-fg);
+  overflow: hidden;
+}
+
+/*
+  Grid and flex children default to a min-width of auto, which lets a single
+  nowrap header push the whole board wider than the screen. When that happens
+  every row stretches with it and the point totals leave the viewport, which is
+  exactly the failure this guards against.
+*/
+.board > *,
+.board-head > *,
+.board-title > * {
+  min-width: 0;
+}
+
+.board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2vh;
+  padding: 0 3vh;
+  border-bottom: 1px solid rgb(248 250 252 / 8%);
+  min-width: 0;
+}
+
+.board-title {
+  display: flex;
+  align-items: baseline;
+  gap: 2vh;
+  min-width: 0;
+}
+
+.board-division {
+  font-size: 4.4vh;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.board-subtitle {
+  font-size: 2.9vh;
+  color: var(--color-board-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-connection {
+  font-size: 2.5vh;
+  color: var(--color-board-muted);
+  flex-shrink: 0;
+}
+
+.board-rows {
+  display: grid;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+}
+
+.board-row {
+  display: grid;
+  grid-template-columns: 1.4vh 7vh minmax(0, 1fr) auto auto;
+  align-items: center;
+  min-width: 0;
+  border-bottom: 1px solid rgb(11 15 20 / 90%);
+  /* The row is tinted with the team's own color, mixed most of the way to the
+     dark base so the text on top keeps its contrast. */
+  background: color-mix(in oklch, var(--team), var(--color-board-bg) 85%);
+}
+
+.board-row:last-child {
+  border-bottom: none;
+}
+
+.board-bar {
+  height: 100%;
+  background: var(--team);
+}
+
+.board-rank {
+  font-size: 4.4vh;
+  font-weight: 600;
+  color: var(--color-board-muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.board-name {
+  font-size: 6vh;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-left: 1.2vh;
+  /* Truncate rather than push the total off the edge of the screen. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-delta {
+  display: flex;
+  align-items: center;
+  padding-right: 2.4vh;
+  width: 4vh;
+}
+
+.board-delta svg {
+  width: 2.6vh;
+  height: 2.6vh;
+}
+
+.board-points {
+  font-size: 16vh;
+  font-weight: 800;
+  line-height: 1;
+  text-align: right;
+  padding-right: 3vh;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.board-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2vh;
+  padding: 0 3vh;
+  border-top: 1px solid rgb(248 250 252 / 8%);
+  font-size: 2.3vh;
+  color: var(--color-board-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.board-foot-warning {
+  color: var(--color-status-retry);
+  flex-shrink: 0;
+}
+
+.board-message {
+  grid-template-rows: 1fr;
+  place-items: center;
+  text-align: center;
+  padding: 4vh;
+}
+
+.board-message h1 {
+  font-size: 5vh;
+  font-weight: 700;
+  margin: 0 0 1.5vh;
+}
+
+.board-message p {
+  font-size: 2.6vh;
+  color: var(--color-board-muted);
+  margin: 0;
+  max-width: 40ch;
+}
+
+/*
+  Phone. A leader glancing at their own screen wants the detail the TV has no
+  room for, so this gains the per-team breakdown rather than shrinking the TV
+  layout down.
+*/
+@media (max-width: 640px) {
+  .board {
+    grid-template-rows: auto 1fr auto;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  .board-head {
+    padding: 16px;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .board-title {
+    flex-wrap: wrap;
+    gap: 0 8px;
+  }
+
+  .board-division { font-size: 22px; }
+
+  /* Allowed to wrap on a phone. Truncating a game name is right on a TV, where
+     space is fixed, and wrong here where the reader is a foot away. */
+  .board-subtitle {
+    font-size: 14px;
+    white-space: normal;
+  }
+
+  .board-connection {
+    font-size: 13px;
+    flex-shrink: 1;
+  }
+
+  .board-rows {
+    grid-template-rows: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+
+  .board-row {
+    border-radius: 14px;
+    border-bottom: none;
+    overflow: hidden;
+    grid-template-columns: 6px 32px minmax(0, 1fr) auto auto;
+    min-height: 68px;
+  }
+
+  .board-rank { font-size: 15px; }
+  .board-name { font-size: 21px; }
+  .board-points { font-size: 38px; padding-right: 14px; }
+  .board-delta { width: 22px; padding-right: 10px; }
+  .board-delta svg { width: 14px; height: 14px; }
+
+  .board-foot {
+    padding: 12px 16px 20px;
+    font-size: 13px;
+    white-space: normal;
+    line-height: 1.5;
+  }
+}
