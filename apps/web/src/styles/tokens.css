@@ -40,12 +40,6 @@
   --color-team-green: #15803d;
   --color-team-green-fg: #ffffff;
 
-  /* The board surface. Dark, because it is projected in a lit gym and a white
-     background at that size is painful to look at for ninety minutes. */
-  --color-board-bg: #0b0f14;
-  --color-board-fg: #f8fafc;
-  --color-board-muted: #94a3b8;
-
   /* NOTE: the app and admin surface is NOT defined here.
      shadcn/ui owns --background, --foreground, --muted-foreground, --border,
      --card and friends, declared in index.css. Defining a parallel set here
@@ -59,4 +53,34 @@
   --color-status-live: #22c55e;
   --color-status-retry: #f59e0b;
   --color-status-down: #ef4444;
+}
+
+/*
+  The board surface, which follows the app's theme.
+
+  Declared outside @theme because it has to change with the theme class, and
+  because the board reads these through var() rather than as utility classes.
+
+  Dark is the better choice for a projector in a lit gym, and it is what the
+  toggle should be left on for a game night. Light exists because the board is
+  also opened on a phone in daylight, where an all-black screen is the wrong
+  answer.
+
+  --board-row-mix is how far each row is pulled toward the surface. Light needs
+  to keep more of the team color to stay distinguishable on a pale ground.
+*/
+:root {
+  --color-board-bg: #ffffff;
+  --color-board-fg: #0f172a;
+  --color-board-muted: #64748b;
+  --color-board-line: #e2e8f0;
+  --board-row-mix: 90%;
+}
+
+.dark {
+  --color-board-bg: #0b0f14;
+  --color-board-fg: #f8fafc;
+  --color-board-muted: #94a3b8;
+  --color-board-line: #1e293b;
+  --board-row-mix: 85%;
 }

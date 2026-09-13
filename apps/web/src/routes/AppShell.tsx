@@ -1,6 +1,7 @@
 import { ClipboardList } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router'
 import { ConnectionDot } from '@/components/ConnectionDot'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { useHub } from '@/lib/signalr/hubContext'
 
 /**
@@ -26,11 +27,14 @@ export function AppShell() {
             <ShellLink to="/app/sessions">Sessions</ShellLink>
           </nav>
 
-          <ConnectionDot
-            className="ml-auto text-xs text-muted-foreground"
-            state={state}
-            lastMessageAt={lastMessageAt}
-          />
+          <div className="ml-auto flex items-center gap-3">
+            <ConnectionDot
+              className="text-xs text-muted-foreground"
+              state={state}
+              lastMessageAt={lastMessageAt}
+            />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

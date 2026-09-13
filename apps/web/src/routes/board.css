@@ -26,7 +26,8 @@
 */
 .board > *,
 .board-head > *,
-.board-title > * {
+.board-title > *,
+.board-foot > * {
   min-width: 0;
 }
 
@@ -36,7 +37,7 @@
   justify-content: space-between;
   gap: 2vh;
   padding: 0 3vh;
-  border-bottom: 1px solid rgb(248 250 252 / 8%);
+  border-bottom: 1px solid var(--color-board-line);
   min-width: 0;
 }
 
@@ -61,10 +62,21 @@
   text-overflow: ellipsis;
 }
 
+.board-tools {
+  display: flex;
+  align-items: center;
+  gap: 1.6vh;
+  flex-shrink: 0;
+}
+
 .board-connection {
   font-size: 2.5vh;
   color: var(--color-board-muted);
-  flex-shrink: 0;
+}
+
+.board-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .board-rows {
@@ -77,10 +89,10 @@
   grid-template-columns: 1.4vh 7vh minmax(0, 1fr) auto auto;
   align-items: center;
   min-width: 0;
-  border-bottom: 1px solid rgb(11 15 20 / 90%);
-  /* The row is tinted with the team's own color, mixed most of the way to the
-     dark base so the text on top keeps its contrast. */
-  background: color-mix(in oklch, var(--team), var(--color-board-bg) 85%);
+  border-bottom: 1px solid var(--color-board-bg);
+  /* Tinted with the team's own color, pulled most of the way to the surface
+     so the text on top keeps its contrast in either theme. */
+  background: color-mix(in oklch, var(--team), var(--color-board-bg) var(--board-row-mix));
 }
 
 .board-row:last-child {
@@ -114,13 +126,17 @@
 .board-delta {
   display: flex;
   align-items: center;
-  padding-right: 2.4vh;
-  width: 4vh;
+  justify-content: center;
+  padding-right: 2vh;
+  width: 8vh;
 }
 
+/* Sized against the point total beside it, not against body text. An arrow
+   that reads at arm's length disappears at thirty feet, and the movement is
+   the part of the board children actually watch for. */
 .board-delta svg {
-  width: 2.6vh;
-  height: 2.6vh;
+  width: 5.5vh;
+  height: 5.5vh;
 }
 
 .board-points {
@@ -139,7 +155,7 @@
   justify-content: space-between;
   gap: 2vh;
   padding: 0 3vh;
-  border-top: 1px solid rgb(248 250 252 / 8%);
+  border-top: 1px solid var(--color-board-line);
   font-size: 2.3vh;
   color: var(--color-board-muted);
   white-space: nowrap;
@@ -209,6 +225,11 @@
     flex-shrink: 1;
   }
 
+  .board-tools {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
   .board-rows {
     grid-template-rows: none;
     display: flex;
@@ -228,8 +249,8 @@
   .board-rank { font-size: 15px; }
   .board-name { font-size: 21px; }
   .board-points { font-size: 38px; padding-right: 14px; }
-  .board-delta { width: 22px; padding-right: 10px; }
-  .board-delta svg { width: 14px; height: 14px; }
+  .board-delta { width: 26px; padding-right: 8px; }
+  .board-delta svg { width: 20px; height: 20px; }
 
   .board-foot {
     padding: 12px 16px 20px;

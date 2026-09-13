@@ -1,8 +1,11 @@
 import { useParams, useSearchParams } from 'react-router'
 import { ConnectionDot } from '@/components/ConnectionDot'
+import { ThemeToggle } from '@/components/ThemeToggle'
+import { useFlip } from '@/lib/hooks/useFlip'
 import { useScoreboard } from '@/lib/hooks/useScoreboard'
 import { useWakeLock } from '@/lib/hooks/useWakeLock'
-import { SessionStatus, type Standing } from '@/lib/types'
+import { formatDate } from '@/lib/format'
+import { SessionStatus, type LastRound, type Standing } from '@/lib/types'
 import './board.css'
 
 /**
@@ -18,6 +21,7 @@ export function BoardPage() {
   const tvMode = search.get('tv') === '1'
 
   const { data, isPending, error, connection, lastMessageAt } = useScoreboard(slug)
+  const registerRow = useFlip()
 
   // The screen must not sleep while a board is on the wall.
   useWakeLock(true)
@@ -40,49 +44,43 @@ export function BoardPage() {
   }
 
   const notStarted = data.status === SessionStatus.Setup
-  const finished = data.status === SessionStatus.Finished
 
   return (
     <div className="board">
       <header className="board-head">
         <div className="board-title">
           <span className="board-division">{data.divisionName}</span>
-          <span className="board-subtitle">
-            {notStarted
-              ? 'Starting soon'
-              : data.lastRound
-                ? `Round ${data.lastRound.roundNumber} · ${data.lastRound.gameName}`
-                : 'No rounds yet'}
-            {finished ? ' · Final' : ''}
-          </span>
+          <span className="board-subtitle">{formatDate(data.date)}</span>
         </div>
 
-        {/* Hidden in TV mode, where the room does not need diagnostics, but the
-            connection state still drives the footer so staleness is never
-            invisible. */}
+        {/* Hidden in TV mode, where the room does not need controls. The
+            connection state still reaches the footer, so staleness is never
+            invisible even there. */}
         {!tvMode && (
-          <ConnectionDot
-            className="board-connection"
-            state={connection}
-            lastMessageAt={lastMessageAt}
-          />
+          <div className="board-tools">
+            <ConnectionDot
+              className="board-connection"
+              state={connection}
+              lastMessageAt={lastMessageAt}
+            />
+            <ThemeToggle />
+          </div>
         )}
       </header>
 
       <div className="board-rows">
         {data.standings.map((team) => (
-          <TeamRow key={team.teamId} team={team} showPoints={!notStarted} />
+          <TeamRow
+            key={team.teamId}
+            ref={registerRow(team.teamId)}
+            team={team}
+            showPoints={!notStarted}
+          />
         ))}
       </div>
 
       <footer className="board-foot">
-        {notStarted ? (
-          <span>Waiting for the first round.</span>
-        ) : data.lastRound ? (
-          <span>{summarize(data.lastRound.roundNumber, data.lastRound.gameName, data.standings)}</span>
-        ) : (
-          <span>No rounds recorded yet.</span>
-        )}
+        <span className="board-summary">{summarize(data.status, data.lastRound)}</span>
 
         {tvMode && connection !== 'live' && (
           <span className="board-foot-warning">
@@ -94,9 +92,18 @@ export function BoardPage() {
   )
 }
 
-function TeamRow({ team, showPoints }: { team: Standing; showPoints: boolean }) {
+function TeamRow({
+  ref,
+  team,
+  showPoints,
+}: {
+  ref: (element: HTMLElement | null) => void
+  team: Standing
+  showPoints: boolean
+}) {
   return (
     <div
+      ref={ref}
       className="board-row"
       style={
         {
@@ -123,16 +130,26 @@ function TeamRow({ team, showPoints }: { team: Standing; showPoints: boolean }) 
   )
 }
 
-function summarize(roundNumber: number, gameName: string, standings: Standing[]): string {
-  const leader = standings[0]
-  const tiedAtTop = standings.filter((s) => s.rank === 1)
+/**
+ * One line describing the last round only. The totals are already enormous on
+ * the screen above, so repeating them here would be noise; what the room cannot
+ * see is what just changed.
+ */
+function summarize(status: SessionStatus, lastRound: LastRound | null): string {
+  if (status === SessionStatus.Setup) return 'Starting soon.'
+  if (!lastRound) return 'No rounds yet.'
 
-  if (tiedAtTop.length > 1) {
-    const names = tiedAtTop.map((s) => s.name).join(' and ')
-    return `Round ${roundNumber}, ${gameName}. ${names} lead on ${Math.round(leader.points)}.`
-  }
+  const scores = lastRound.teams
+    .map((team) => {
+      const points = Math.round(team.points)
+      if (team.isDisqualified) return `${team.teamName} DQ`
+      return `${team.teamName} ${points > 0 ? '+' : ''}${points}`
+    })
+    .join(' · ')
 
-  return `Round ${roundNumber}, ${gameName}. ${leader.name} leads on ${Math.round(leader.points)}.`
+  const doubled = lastRound.multiplier !== 1 ? ` (×${lastRound.multiplier})` : ''
+
+  return `Round ${lastRound.roundNumber} · ${lastRound.gameName}${doubled} — ${scores}`
 }
 
 function BoardMessage({ title, detail }: { title: string; detail: string }) {
@@ -148,7 +165,15 @@ function BoardMessage({ title, detail }: { title: string; detail: string }) {
 
 function ArrowUp() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-status-live)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-label="moved up">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--color-status-live)"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-label="moved up"
+    >
       <path d="M12 19V5" />
       <path d="M5 12l7-7 7 7" />
     </svg>
@@ -157,7 +182,15 @@ function ArrowUp() {
 
 function ArrowDown() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-status-down)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-label="moved down">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--color-status-down)"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-label="moved down"
+    >
       <path d="M12 5v14" />
       <path d="M19 12l-7 7-7-7" />
     </svg>

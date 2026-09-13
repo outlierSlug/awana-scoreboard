@@ -5,18 +5,21 @@ import { BrowserRouter } from 'react-router'
 import App from './App.tsx'
 import './index.css'
 import { queryClient } from './lib/queryClient'
+import { ThemeProvider } from './lib/theme'
 import { HubProvider } from './lib/signalr/HubProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      {/* One hub connection for the whole app, above the router, so navigating
-          between the board and the console does not tear it down. */}
-      <HubProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </HubProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        {/* One hub connection for the whole app, above the router, so navigating
+            between the board and the console does not tear it down. */}
+        <HubProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </HubProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 )
