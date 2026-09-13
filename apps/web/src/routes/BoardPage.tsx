@@ -135,7 +135,7 @@ function summarize(status: SessionStatus, lastRound: LastRound | null): string {
 
   const scores = lastRound.teams
     .map((team) => {
-      if (team.isDisqualified) return `${team.teamName} disqualified`
+      if (team.isDisqualified) return `${team.teamName} DQ`
       return `${team.teamName} +${Math.round(team.points)}`
     })
     .join(', ')
