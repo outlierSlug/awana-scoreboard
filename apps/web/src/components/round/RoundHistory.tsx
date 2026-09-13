@@ -1,8 +1,11 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { RoundSummary, SessionTeam } from '@/lib/types'
+
+/** How many rounds the list shows before it asks to be opened. */
+const COLLAPSED_ROUNDS = 5
 
 /**
  * What has been recorded tonight, newest first.
@@ -29,6 +32,7 @@ export function RoundHistory({
   onEdit: (round: RoundSummary, label: string) => void
 }) {
   const [clearing, setClearing] = useState<{ round: RoundSummary; label: string } | null>(null)
+  const [showAll, setShowAll] = useState(false)
 
   const colorOf = new Map(teams.map((team) => [team.teamId, team.colorHex]))
 
@@ -45,6 +49,13 @@ export function RoundHistory({
     .sort((a, b) => a.roundNumber - b.roundNumber)
     .map((round, index) => ({ round, label: `Round ${index + 1}` }))
 
+  // Newest first, and only the last few by default. A games night runs to a
+  // dozen rounds or more, and the one anyone is looking for is almost always
+  // the one that just went up. The rest is there when it is wanted.
+  const newestFirst = [...live].reverse()
+  const shown = showAll ? newestFirst : newestFirst.slice(0, COLLAPSED_ROUNDS)
+  const hidden = newestFirst.length - shown.length
+
   return (
     <section>
       <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
@@ -57,7 +68,7 @@ export function RoundHistory({
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
-          {[...live].reverse().map(({ round, label }) => (
+          {shown.map(({ round, label }) => (
             <li key={round.id} className="rounded-xl bg-card p-4 ring-1 ring-foreground/10">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="font-semibold">
@@ -113,6 +124,17 @@ export function RoundHistory({
             </li>
           ))}
         </ul>
+      )}
+
+      {(hidden > 0 || showAll) && (
+        <Button
+          variant="ghost"
+          className="mt-2 w-full"
+          onClick={() => setShowAll((open) => !open)}
+        >
+          <ChevronDown className={showAll ? 'rotate-180 transition-transform' : 'transition-transform'} />
+          {showAll ? 'Show fewer' : `Show ${hidden} earlier ${hidden === 1 ? 'round' : 'rounds'}`}
+        </Button>
       )}
 
       <ConfirmDialog

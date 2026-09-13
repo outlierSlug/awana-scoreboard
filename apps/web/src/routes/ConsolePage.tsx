@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ExternalLink, Flag, Play, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { FinalStandings } from '@/components/round/FinalStandings'
 import { RoundEntry } from '@/components/round/RoundEntry'
 import { RoundHistory } from '@/components/round/RoundHistory'
 import { SessionStatusLabel } from '@/components/SessionStatusLabel'
@@ -10,7 +11,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
-import { SessionStatus, type RoundSummary, type SessionDetail } from '@/lib/types'
+import { SessionStatus, type RoundSummary, type Scoreboard, type SessionDetail } from '@/lib/types'
 import { formatDate } from '@/lib/format'
 
 export function ConsolePage() {
@@ -36,9 +37,24 @@ export function ConsolePage() {
     enabled: Boolean(id),
   })
 
+  // Once the night is over the scorekeeper wants the result, not a list of who
+  // played. Read from the same endpoint the wall reads, so the totals here and
+  // the totals in the room are the same numbers.
+  const finalBoard = useQuery<Scoreboard>({
+    queryKey: queryKeys.scoreboard(session.data?.slug ?? ''),
+    queryFn: ({ signal }) => api.publicScoreboard(session.data!.slug, signal),
+    enabled: session.data?.status === SessionStatus.Finished,
+  })
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.session(id!) })
     await queryClient.invalidateQueries({ queryKey: queryKeys.sessions() })
+
+    // The standings panel reads the board's own endpoint, so a round recorded
+    // or cleared here has to reach it too.
+    if (session.data) {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scoreboard(session.data.slug) })
+    }
   }
 
   const clearRound = useMutation({
@@ -165,7 +181,21 @@ export function ConsolePage() {
         />
       )}
 
-      {data.status !== SessionStatus.Running && (
+      {data.status === SessionStatus.Finished && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+            Final standings
+          </h2>
+
+          {finalBoard.data ? (
+            <FinalStandings standings={finalBoard.data.standings} />
+          ) : (
+            <div className="h-24 animate-pulse rounded-xl bg-muted" />
+          )}
+        </section>
+      )}
+
+      {data.status === SessionStatus.Setup && (
       <section>
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Teams
