@@ -44,6 +44,32 @@ public class SessionService(
                 s.Rounds.Count(r => r.VoidedAt == null)))
             .ToListAsync(ct);
 
+    /// <summary>
+    /// Nights that are over, newest first.
+    /// </summary>
+    /// <remarks>
+    /// Capped rather than paged. Somebody looking for last week's result wants
+    /// the last few weeks, and a club accumulates one of these a week, so a
+    /// page control here would be scaffolding for a list nobody scrolls.
+    /// </remarks>
+    public async Task<IReadOnlyList<SessionSummaryDto>> ListFinishedAsync(
+        string churchSlug, int limit = 12, CancellationToken ct = default) =>
+        await db.Sessions
+            .AsNoTracking()
+            .Include(s => s.Division)
+            .Where(s => s.Church.Slug == churchSlug && s.Status == SessionStatus.Finished)
+            .OrderByDescending(s => s.Date)
+            .ThenBy(s => s.Division.SortOrder)
+            .Take(Math.Clamp(limit, 1, 50))
+            .Select(s => new SessionSummaryDto(
+                s.Id,
+                s.PublicSlug,
+                s.Division.Name,
+                s.Date,
+                s.Status,
+                s.Rounds.Count(r => r.VoidedAt == null)))
+            .ToListAsync(ct);
+
     public async Task<ServiceResult<SessionDetailDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
         var session = await db.Sessions

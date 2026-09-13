@@ -62,6 +62,17 @@
   text-overflow: ellipsis;
 }
 
+.board-final {
+  flex-shrink: 0;
+  padding: 0.4vh 1.4vh;
+  border-radius: 999px;
+  background: var(--color-board-line);
+  font-size: 2.2vh;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .board-tools {
   display: flex;
   align-items: center;
@@ -225,7 +236,18 @@
     flex-shrink: 1;
   }
 
-  .board-tools {
+  .board-final {
+  flex-shrink: 0;
+  padding: 0.4vh 1.4vh;
+  border-radius: 999px;
+  background: var(--color-board-line);
+  font-size: 2.2vh;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.board-tools {
     gap: 10px;
     flex-wrap: wrap;
   }

@@ -51,17 +51,26 @@ export function BoardPage() {
           <span className="board-subtitle">{formatDate(data.date)}</span>
         </div>
 
-        {/* Hidden in TV mode, where the room does not need controls. The
-            connection state still reaches the footer, so staleness is never
-            invisible even there. */}
-        {!tvMode && (
+        {/* Once the night is over the corner stops reporting the connection
+            and says so instead. A live connection is only worth watching while
+            there are still scores coming, and "Live" sitting on a board that
+            has finished is the one thing it must not say. Shown in TV mode too,
+            where it is the room's only word that the games are done. */}
+        {(!tvMode || data.status === SessionStatus.Finished) && (
           <div className="board-tools">
-            <ConnectionDot
-              className="board-connection"
-              state={connection}
-              lastMessageAt={lastMessageAt}
-            />
-            <ThemeToggle />
+            {data.status === SessionStatus.Finished ? (
+              <span className="board-final">Finished</span>
+            ) : (
+              <ConnectionDot
+                className="board-connection"
+                state={connection}
+                lastMessageAt={lastMessageAt}
+              />
+            )}
+
+            {/* Controls stay out of TV mode, where the room does not need
+                them, but the word Finished belongs on the wall either way. */}
+            {!tvMode && <ThemeToggle />}
           </div>
         )}
       </header>
@@ -75,7 +84,7 @@ export function BoardPage() {
       <footer className="board-foot">
         <span className="board-summary">{summarize(data.status, data.lastRound)}</span>
 
-        {tvMode && connection !== 'live' && (
+        {tvMode && connection !== 'live' && data.status !== SessionStatus.Finished && (
           <span className="board-foot-warning">
             <ConnectionDot state={connection} lastMessageAt={lastMessageAt} />
           </span>

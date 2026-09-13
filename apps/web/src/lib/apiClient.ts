@@ -100,6 +100,14 @@ export const api = {
   liveSessions: (church: string, signal?: AbortSignal) =>
     request<SessionSummary[]>('GET', `/api/public/live?church=${encodeURIComponent(church)}`, undefined, signal),
 
+  finishedSessions: (church: string, signal?: AbortSignal) =>
+    request<SessionSummary[]>(
+      'GET',
+      `/api/public/finished?church=${encodeURIComponent(church)}`,
+      undefined,
+      signal,
+    ),
+
   publicScoreboard: (slug: string, signal?: AbortSignal) =>
     request<Scoreboard>('GET', `/api/public/sessions/${encodeURIComponent(slug)}/scoreboard`, undefined, signal),
 

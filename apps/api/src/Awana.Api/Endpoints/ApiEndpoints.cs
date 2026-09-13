@@ -31,6 +31,9 @@ public static class ApiEndpoints
         group.MapGet("/live", async (string church, SessionService sessions, CancellationToken ct) =>
             Results.Ok(await sessions.ListLiveAsync(church, ct)));
 
+        group.MapGet("/finished", async (string church, SessionService sessions, CancellationToken ct) =>
+            Results.Ok(await sessions.ListFinishedAsync(church, ct: ct)));
+
         group.MapGet("/sessions/{slug}/scoreboard",
             async (string slug, ScoreboardService scoreboard, CancellationToken ct) =>
             {

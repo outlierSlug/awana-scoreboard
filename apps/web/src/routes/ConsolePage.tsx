@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { RoundEntry } from '@/components/round/RoundEntry'
 import { RoundHistory } from '@/components/round/RoundHistory'
+import { SessionStatusLabel } from '@/components/SessionStatusLabel'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
@@ -92,7 +93,12 @@ export function ConsolePage() {
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{data.divisionName} Games</h1>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="text-2xl font-bold tracking-tight">{data.divisionName} Games</h1>
+              {/* Said outright rather than left to be inferred from which
+                  buttons happen to be on screen. */}
+              <SessionStatusLabel status={data.status} />
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(data.date)} · {liveRounds.length}{' '}
               {liveRounds.length === 1 ? 'round' : 'rounds'} recorded

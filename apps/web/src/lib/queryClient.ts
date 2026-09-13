@@ -8,6 +8,7 @@ import { ApiError } from './apiClient'
 export const queryKeys = {
   scoreboard: (slug: string) => ['scoreboard', slug] as const,
   liveSessions: (church: string) => ['live-sessions', church] as const,
+  finishedSessions: (church: string) => ['finished-sessions', church] as const,
   sessions: () => ['sessions'] as const,
   session: (id: string) => ['session', id] as const,
   divisions: () => ['divisions'] as const,

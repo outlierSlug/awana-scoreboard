@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, MonitorPlay, Radio } from 'lucide-react'
+import { ArrowRight, History, MonitorPlay, Radio } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/apiClient'
@@ -24,6 +24,13 @@ export function HomePage() {
     queryFn: ({ signal }) => api.liveSessions(church, signal),
     // Somebody may leave this open waiting for the night to start.
     refetchInterval: 15_000,
+  })
+
+  // Last week's result is the other thing anyone comes here for, and a session
+  // leaves the list above the moment it is finished.
+  const finished = useQuery<SessionSummary[]>({
+    queryKey: queryKeys.finishedSessions(church),
+    queryFn: ({ signal }) => api.finishedSessions(church, signal),
   })
 
   return (
@@ -93,6 +100,36 @@ export function HomePage() {
               <code className="rounded bg-muted px-1 py-0.5">?tv=1</code> for a full screen with no
               chrome.
             </p>
+          )}
+
+          {finished.data && finished.data.length > 0 && (
+            <section className="mt-10">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                <History className="size-4" />
+                Finished
+              </h2>
+
+              <ul className="flex flex-col gap-2">
+                {finished.data.map((session) => (
+                  <li key={session.id}>
+                    <Link
+                      to={`/board/${session.slug}`}
+                      className="group/card flex items-center gap-3 rounded-xl px-4 py-3 ring-1 ring-foreground/10 transition-all hover:ring-foreground/25"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="font-semibold">{session.divisionName}</span>
+                        <span className="mt-0.5 block text-sm text-muted-foreground">
+                          {formatDate(session.date)} · {session.roundCount}{' '}
+                          {session.roundCount === 1 ? 'round' : 'rounds'}
+                        </span>
+                      </span>
+
+                      <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover/card:translate-x-0.5" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
         </main>
 
