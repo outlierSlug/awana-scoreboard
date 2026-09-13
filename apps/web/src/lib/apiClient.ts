@@ -8,6 +8,7 @@ import type {
   RoundRecorded,
   Scoreboard,
   SessionDetail,
+  Me,
   SessionSummary,
   UpdateRoundRequest,
 } from './types'
@@ -131,6 +132,20 @@ export const api = {
   startSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/start`),
   finishSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/finish`),
   reopenSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/reopen`),
+
+  // Auth.
+  me: (signal?: AbortSignal) => request<Me>('GET', '/api/auth/me', undefined, signal),
+
+  logout: () => request<{ returnUrl: string }>('POST', '/api/auth/logout'),
+
+  /**
+   * Where to SEND the browser to sign in, rather than something to fetch.
+   *
+   * The whole point of the round trip is that Google gets the browser and hands
+   * it back, and neither leg of that can happen inside an XHR.
+   */
+  loginUrl: (returnUrl: string) =>
+    `${config.apiBaseUrl}/api/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`,
 
   // Rounds.
   preview: (sessionId: string, body: PreviewRequest, signal?: AbortSignal) =>

@@ -1,3 +1,4 @@
+using Awana.Api.Auth;
 using Awana.Api.Endpoints;
 using Awana.Api.Realtime;
 using Awana.Api.Services;
@@ -17,6 +18,10 @@ builder.Services.AddScoped<ScoreboardService>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<RoundService>();
 builder.Services.AddSingleton<IScoreboardBroadcaster, ScoreboardBroadcaster>();
+
+// Google sign-in onto a cookie session, plus the role policies. Registered
+// before CORS matters, because the cookie only reaches the API if both agree.
+builder.Services.AddAwanaAuth(builder.Configuration);
 
 builder.Services.AddSignalR();
 
@@ -68,6 +73,9 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 
 app.UseCors(WebCorsPolicy);
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Render polls this to decide whether a deploy succeeded and whether the
 // instance is still alive. It must stay cheap and must not touch the database,

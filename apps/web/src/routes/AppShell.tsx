@@ -1,7 +1,9 @@
-import { ClipboardList } from 'lucide-react'
+import { ClipboardList, LogOut } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router'
 import { ConnectionDot } from '@/components/ConnectionDot'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { Button } from '@/components/ui/button'
+import { useMe, useSignOut } from '@/lib/auth'
 import { useHub } from '@/lib/signalr/hubContext'
 
 /**
@@ -13,6 +15,8 @@ import { useHub } from '@/lib/signalr/hubContext'
  */
 export function AppShell() {
   const { state, lastMessageAt } = useHub()
+  const { me } = useMe()
+  const signOut = useSignOut()
 
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
@@ -37,7 +41,28 @@ export function AppShell() {
               state={state}
               lastMessageAt={lastMessageAt}
             />
+
+            {/* Who is recording tonight. Worth saying out loud, because the
+                rounds carry that name and a shared laptop is the normal case. */}
+            {me?.displayName && (
+              <span className="hidden max-w-40 truncate text-xs text-muted-foreground lg:inline">
+                {me.displayName}
+              </span>
+            )}
+
             <ThemeToggle />
+
+            {me?.isSignedIn && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Sign out"
+                title="Sign out"
+                onClick={signOut}
+              >
+                <LogOut />
+              </Button>
+            )}
           </div>
         </div>
       </header>

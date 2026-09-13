@@ -1,6 +1,11 @@
+using System.Security.Claims;
+using Awana.Api.Auth;
 using Awana.Api.Contracts;
 using Awana.Api.Services;
 using Awana.Data;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.EntityFrameworkCore;
 
 namespace Awana.Api.Endpoints;
@@ -9,10 +14,61 @@ public static class ApiEndpoints
 {
     public static void MapAwanaApi(this WebApplication app)
     {
+        MapAuth(app);
         MapPublic(app);
         MapCatalog(app);
         MapSessions(app);
         MapRounds(app);
+    }
+
+    // ----------------------------------------------------------------- auth
+
+    private static void MapAuth(WebApplication app)
+    {
+        var group = app.MapGroup("/api/auth").WithTags("Auth");
+
+        // A full page navigation, not a fetch: this hands the browser to
+        // Google and Google hands it back, and neither leg can happen inside
+        // an XHR.
+        group.MapGet("/login", (HttpContext context, string? returnUrl) =>
+        {
+            var google = context.RequestServices
+                .GetRequiredService<IConfiguration>()
+                .GetSection(GoogleAuthOptions.SectionName).Get<GoogleAuthOptions>() ?? new GoogleAuthOptions();
+
+            if (!google.IsConfigured)
+            {
+                return Results.Problem(
+                    detail: "Google sign-in is not configured on this server.",
+                    statusCode: StatusCodes.Status503ServiceUnavailable,
+                    title: "Sign-in unavailable",
+                    extensions: new Dictionary<string, object?> { ["code"] = "google_not_configured" });
+            }
+
+            return Results.Challenge(
+                new AuthenticationProperties { RedirectUri = ReturnTargets.AfterSignIn(context, returnUrl) },
+                [GoogleDefaults.AuthenticationScheme]);
+        });
+
+        group.MapPost("/logout", async (HttpContext context) =>
+        {
+            await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return Results.Ok(new { returnUrl = ReturnTargets.AfterSignOut(context) });
+        });
+
+        // Who am I, if anyone. The web app asks this on load to decide between
+        // the console and the sign-in page, so an anonymous caller is a normal
+        // answer rather than a 401.
+        group.MapGet("/me", (ClaimsPrincipal user) =>
+        {
+            if (user.Id() is not { } id) return Results.Ok(new MeDto(false, null, null, null));
+
+            return Results.Ok(new MeDto(
+                true,
+                id,
+                user.FindFirstValue(System.Security.Claims.ClaimTypes.Name),
+                user.RoleOf()?.ToString()));
+        });
     }
 
     // --------------------------------------------------------------- public
@@ -48,7 +104,9 @@ public static class ApiEndpoints
 
     private static void MapCatalog(WebApplication app)
     {
-        var group = app.MapGroup("/api").WithTags("Catalog");
+        // Divisions and the game list are only of use to somebody recording a
+        // round, and naming the club's divisions is not public information.
+        var group = app.MapGroup("/api").WithTags("Catalog").RequireAuthorization();
 
         group.MapGet("/divisions", async (AwanaDbContext db, CancellationToken ct) =>
             Results.Ok(await db.Divisions
@@ -74,7 +132,9 @@ public static class ApiEndpoints
 
     private static void MapSessions(WebApplication app)
     {
-        var group = app.MapGroup("/api/sessions").WithTags("Sessions");
+        // Reading a session is for anyone signed in. Changing one takes a
+        // role, applied per endpoint below.
+        var group = app.MapGroup("/api/sessions").WithTags("Sessions").RequireAuthorization();
 
         group.MapGet("/", async (SessionService sessions, CancellationToken ct) =>
             Results.Ok(await sessions.ListAsync(ct)));
@@ -82,22 +142,27 @@ public static class ApiEndpoints
         group.MapGet("/{id:guid}", async (Guid id, SessionService sessions, CancellationToken ct) =>
             Problems.Wrap(await sessions.GetAsync(id, ct)));
 
-        group.MapPost("/", async (CreateSessionRequest request, SessionService sessions, CancellationToken ct) =>
+        group.MapPost("/", async (CreateSessionRequest request, ClaimsPrincipal user, SessionService sessions, CancellationToken ct) =>
         {
-            var result = await sessions.CreateAsync(request, CurrentUser.Id, ct);
+            var result = await sessions.CreateAsync(request, user.Id(), ct);
             return result.Ok
                 ? Results.Created($"/api/sessions/{result.Value!.Id}", result.Value)
                 : Problems.From(result.Error!);
-        });
+        }).RequireAuthorization(AuthPolicies.GamesLeader);
 
-        group.MapPost("/{id:guid}/start", async (Guid id, SessionService sessions, CancellationToken ct) =>
-            Problems.Wrap(await sessions.StartAsync(id, CurrentUser.Id, ct)));
+        group.MapPost("/{id:guid}/start", async (Guid id, ClaimsPrincipal user, SessionService sessions, CancellationToken ct) =>
+            Problems.Wrap(await sessions.StartAsync(id, user.Id(), ct)))
+            .RequireAuthorization(AuthPolicies.GamesLeader);
 
-        group.MapPost("/{id:guid}/finish", async (Guid id, SessionService sessions, CancellationToken ct) =>
-            Problems.Wrap(await sessions.FinishAsync(id, CurrentUser.Id, ct)));
+        group.MapPost("/{id:guid}/finish", async (Guid id, ClaimsPrincipal user, SessionService sessions, CancellationToken ct) =>
+            Problems.Wrap(await sessions.FinishAsync(id, user.Id(), ct)))
+            .RequireAuthorization(AuthPolicies.GamesLeader);
 
-        group.MapPost("/{id:guid}/reopen", async (Guid id, SessionService sessions, CancellationToken ct) =>
-            Problems.Wrap(await sessions.ReopenAsync(id, CurrentUser.Id, ct)));
+        group.MapPost("/{id:guid}/reopen", async (Guid id, ClaimsPrincipal user, SessionService sessions, CancellationToken ct) =>
+            Problems.Wrap(await sessions.ReopenAsync(id, user.Id(), ct)))
+            // Reopening rewrites a night that was called finished, so it is the
+            // one session action kept to an admin.
+            .RequireAuthorization(AuthPolicies.Admin);
 
         // Writes nothing. Called on every change in the console, so it has to
         // stay cheap.
@@ -106,9 +171,9 @@ public static class ApiEndpoints
                 Problems.Wrap(await rounds.PreviewAsync(id, request, ct)));
 
         group.MapPost("/{id:guid}/rounds",
-            async (Guid id, CreateRoundRequest request, RoundService rounds, CancellationToken ct) =>
+            async (Guid id, CreateRoundRequest request, ClaimsPrincipal user, RoundService rounds, CancellationToken ct) =>
             {
-                var result = await rounds.CreateAsync(id, request, CurrentUser.Id, ct);
+                var result = await rounds.CreateAsync(id, request, user.Id(), ct);
 
                 if (!result.Ok) return Problems.From(result.Error!);
 
@@ -120,33 +185,25 @@ public static class ApiEndpoints
                 return wasReplay
                     ? Results.Ok(dto)
                     : Results.Created($"/api/rounds/{dto.RoundId}", dto);
-            });
+            }).RequireAuthorization(AuthPolicies.Scorekeeper);
     }
 
     // --------------------------------------------------------------- rounds
 
     private static void MapRounds(WebApplication app)
     {
-        var group = app.MapGroup("/api/rounds").WithTags("Rounds");
+        // Correcting a round is the scorekeeper's own job, same as recording one.
+        var group = app.MapGroup("/api/rounds").WithTags("Rounds")
+            .RequireAuthorization(AuthPolicies.Scorekeeper);
 
         group.MapPut("/{id:guid}",
-            async (Guid id, UpdateRoundRequest request, RoundService rounds, CancellationToken ct) =>
-                Problems.Wrap(await rounds.UpdateAsync(id, request, CurrentUser.Id, ct)));
+            async (Guid id, UpdateRoundRequest request, ClaimsPrincipal user, RoundService rounds, CancellationToken ct) =>
+                Problems.Wrap(await rounds.UpdateAsync(id, request, user.Id(), ct)));
 
         group.MapPost("/{id:guid}/void",
-            async (Guid id, VoidRoundRequest request, RoundService rounds, CancellationToken ct) =>
-                Problems.Wrap(await rounds.VoidAsync(id, request.Reason, CurrentUser.Id, ct)));
+            async (Guid id, VoidRoundRequest request, ClaimsPrincipal user, RoundService rounds, CancellationToken ct) =>
+                Problems.Wrap(await rounds.VoidAsync(id, request.Reason, user.Id(), ct)));
     }
-}
-
-/// <summary>
-/// Placeholder until Google sign-in lands on day 10, at which point this is
-/// replaced by the authenticated principal. Kept in one place so there is
-/// exactly one thing to change.
-/// </summary>
-internal static class CurrentUser
-{
-    public static Guid? Id => null;
 }
 
 /// <summary>Maps service failures onto RFC 9457 problem responses.</summary>

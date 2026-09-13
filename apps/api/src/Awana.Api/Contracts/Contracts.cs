@@ -158,3 +158,15 @@ public sealed record RoundSummaryDto(
     IReadOnlyList<RoundTeamDto> Teams);
 
 public sealed record GameDto(Guid Id, string Name, bool IsCore, Guid? DivisionId);
+
+/// <summary>
+/// Who the caller is, or that they are nobody.
+///
+/// Anonymous is an ordinary answer rather than a 401, because the web app asks
+/// this before it knows which page it is allowed to show.
+/// </summary>
+public sealed record MeDto(
+    bool IsSignedIn,
+    Guid? UserId,
+    string? DisplayName,
+    string? Role);

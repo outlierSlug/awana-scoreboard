@@ -103,6 +103,36 @@ export interface SessionDetail {
   rounds: RoundSummary[]
 }
 
+/** Roles, ordered so the UI can ask "at least this" the way the API does. */
+export const UserRole = {
+  Viewer: 'Viewer',
+  Scorekeeper: 'Scorekeeper',
+  GamesLeader: 'GamesLeader',
+  Admin: 'Admin',
+} as const
+
+export type UserRole = (typeof UserRole)[keyof typeof UserRole]
+
+const ROLE_RANK: Record<UserRole, number> = {
+  Viewer: 10,
+  Scorekeeper: 20,
+  GamesLeader: 30,
+  Admin: 40,
+}
+
+export function atLeast(role: string | null | undefined, minimum: UserRole): boolean {
+  if (!role || !(role in ROLE_RANK)) return false
+  return ROLE_RANK[role as UserRole] >= ROLE_RANK[minimum]
+}
+
+/** Who the caller is, or that they are nobody. Anonymous is a normal answer. */
+export interface Me {
+  isSignedIn: boolean
+  userId: string | null
+  displayName: string | null
+  role: string | null
+}
+
 export interface Division {
   id: string
   name: string

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Awana.Api.Contracts;
+using Awana.Data.Entities;
 
 namespace Awana.Api.Tests;
 
@@ -208,5 +209,55 @@ public class RoundLifecycleTests(ApiFixture fixture)
         Assert.Equal(80m, after.Scoreboard.Standings.Single(s => s.TeamId == teams[3]).Points);
         Assert.Equal(20m, after.Scoreboard.Standings.Single(s => s.TeamId == teams[0]).Points);
         Assert.Equal(1, after.Scoreboard.RoundCount);
+    }
+
+    // ------------------------------------------------------------------- 6
+
+    [Fact]
+    public async Task Recording_a_round_requires_signing_in()
+    {
+        // The console is a URL like any other. Before auth existed, anybody who
+        // found it could record, correct and clear rounds.
+        var client = Client;
+        var (divisionId, gameId, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 11, 6));
+        await StartAsync(client, session.Id);
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post, $"/api/sessions/{session.Id}/rounds")
+        {
+            Content = JsonContent.Create(CleanRound(gameId, teams)),
+        };
+        request.Headers.Add(TestAuth.RoleHeader, TestAuth.Anonymous);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // ------------------------------------------------------------------- 7
+
+    [Fact]
+    public async Task Reopening_a_finished_session_is_kept_to_an_admin()
+    {
+        // Recording rounds and rewriting a night that was already called
+        // finished are different levels of trust, and the roles are ordered so
+        // that the second implies the first rather than the other way round.
+        var client = Client;
+        var (divisionId, _, _) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 11, 13));
+        await StartAsync(client, session.Id);
+        (await client.PostAsync($"/api/sessions/{session.Id}/finish", null)).EnsureSuccessStatusCode();
+
+        using var asScorekeeper = new HttpRequestMessage(
+            HttpMethod.Post, $"/api/sessions/{session.Id}/reopen");
+        asScorekeeper.Headers.Add(TestAuth.RoleHeader, nameof(UserRole.Scorekeeper));
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(asScorekeeper)).StatusCode);
+
+        // And the admin the role exists for can.
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/sessions/{session.Id}/reopen", null)).StatusCode);
     }
 }
