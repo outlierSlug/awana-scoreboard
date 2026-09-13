@@ -225,6 +225,11 @@ export function RoundEntry({
 
   const ready = !blocked && !record.isPending
 
+  // Before a game is chosen the button says what it is for rather than what is
+  // missing. The empty finish order panel is already asking for the game, and
+  // a button whose only label is an instruction reads as part of the form.
+  const submitLabel = editing ? 'Save changes' : 'Confirm round'
+
   const submit = useCallback(() => {
     if (!ready) return
 
@@ -472,9 +477,7 @@ export function RoundEntry({
             ready ? 'text-lg font-bold shadow-lg shadow-primary/25 ring-2 ring-primary/25' : '',
           ].join(' ')}
         >
-          {record.isPending
-            ? 'Saving...'
-            : (blocked ?? (editing ? 'Save changes' : 'Confirm round'))}
+          {record.isPending ? 'Saving...' : !draft.gameId ? submitLabel : (blocked ?? submitLabel)}
         </Button>
 
         {onCancel && (

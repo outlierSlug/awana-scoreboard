@@ -2,7 +2,7 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import type { RoundSummary } from '@/lib/types'
+import type { RoundSummary, SessionTeam } from '@/lib/types'
 
 /**
  * What has been recorded tonight, newest first.
@@ -13,12 +13,15 @@ import type { RoundSummary } from '@/lib/types'
  */
 export function RoundHistory({
   rounds,
+  teams,
   editable,
   busy,
   onClear,
   onEdit,
 }: {
   rounds: RoundSummary[]
+  /** For the team colors, which a recorded round does not carry itself. */
+  teams: SessionTeam[]
   /** Corrections need a running session. */
   editable: boolean
   busy: boolean
@@ -26,6 +29,8 @@ export function RoundHistory({
   onEdit: (round: RoundSummary, label: string) => void
 }) {
   const [clearing, setClearing] = useState<{ round: RoundSummary; label: string } | null>(null)
+
+  const colorOf = new Map(teams.map((team) => [team.teamId, team.colorHex]))
 
   // Cleared rounds are left out entirely: one is a mistake being taken back,
   // and listing it only invites a question about the numbering. It stays in
@@ -91,7 +96,12 @@ export function RoundHistory({
 
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 {round.teams.map((team) => (
-                  <span key={team.teamId}>
+                  <span key={team.teamId} className="inline-flex items-center gap-1.5">
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ background: colorOf.get(team.teamId) ?? 'currentColor' }}
+                      aria-hidden
+                    />
                     {team.teamName}{' '}
                     <span className="font-semibold text-foreground tabular-nums">
                       {Math.round(team.points)}

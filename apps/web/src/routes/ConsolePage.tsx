@@ -184,6 +184,7 @@ export function ConsolePage() {
       <div className={recede}>
         <RoundHistory
           rounds={data.rounds}
+          teams={data.teams}
           editable={data.status === SessionStatus.Running}
           busy={roundPending}
           onClear={(round, reason) => clearRound.mutate({ round, reason })}

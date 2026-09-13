@@ -324,8 +324,8 @@ describe('blockingReason', () => {
     expect(blockingReason(emptyDraft(null), ALL)).toBe('Pick a game to start')
   })
 
-  it('asks for a first tap', () => {
-    expect(blockingReason(emptyDraft(GAME), ALL)).toBe('Tap a team to start')
+  it('counts an untouched round as waiting on everybody', () => {
+    expect(blockingReason(emptyDraft(GAME), ALL)).toBe('Waiting on 4 teams')
   })
 
   it('will not send while a tie is still being collected', () => {

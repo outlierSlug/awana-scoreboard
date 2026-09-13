@@ -256,8 +256,9 @@ export function roundDraftReducer(state: DraftState, action: DraftAction): Draft
 export function blockingReason(state: DraftState, allTeamIds: string[]): string | null {
   if (!state.gameId) return 'Pick a game to start'
   if (state.tieArmed) return 'Finish the tie first'
-  if (state.groups.length === 0) return 'Tap a team to start'
 
+  // An untouched round is just one waiting on everybody, and counting down
+  // from four reads the same as counting down from two.
   const placed = new Set(placedTeams(state))
   const missing = allTeamIds.filter((id) => !placed.has(id))
 
