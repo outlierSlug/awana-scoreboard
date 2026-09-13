@@ -21,6 +21,14 @@ export function ConsolePage() {
   const [editing, setEditing] = useState<{ round: RoundSummary; label: string } | null>(null)
   const [finishing, setFinishing] = useState(false)
 
+  // A tie takes over the whole page, not just the form. Everything that is not
+  // a team block steps back and stops answering until the tie is closed, so
+  // the one thing left to do is the only thing that looks live.
+  const [tieArmed, setTieArmed] = useState(false)
+  const recede = tieArmed
+    ? 'pointer-events-none opacity-40 transition-opacity duration-200'
+    : 'transition-opacity duration-200'
+
   const session = useQuery<SessionDetail>({
     queryKey: queryKeys.session(id ?? ''),
     queryFn: ({ signal }) => api.session(id!, signal),
@@ -91,7 +99,7 @@ export function ConsolePage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className={`flex flex-wrap gap-2 ${recede}`}>
             {data.status !== SessionStatus.Setup && (
               <Button asChild variant="outline" size="lg">
                 <a href={`/board/${data.slug}`} target="_blank" rel="noreferrer">
@@ -146,6 +154,7 @@ export function ConsolePage() {
           session={data}
           // The dialog on top gets the keyboard while it is open.
           shortcuts={editing === null}
+          onTieArmed={setTieArmed}
           onDone={refresh}
         />
       )}
@@ -172,13 +181,15 @@ export function ConsolePage() {
       </section>
       )}
 
-      <RoundHistory
-        rounds={data.rounds}
-        editable={data.status === SessionStatus.Running}
-        busy={roundPending}
-        onClear={(round, reason) => clearRound.mutate({ round, reason })}
-        onEdit={(round, label) => setEditing({ round, label })}
-      />
+      <div className={recede}>
+        <RoundHistory
+          rounds={data.rounds}
+          editable={data.status === SessionStatus.Running}
+          busy={roundPending}
+          onClear={(round, reason) => clearRound.mutate({ round, reason })}
+          onEdit={(round, label) => setEditing({ round, label })}
+        />
+      </div>
 
       <ConfirmDialog
         open={finishing}

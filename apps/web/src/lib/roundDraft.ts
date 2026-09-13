@@ -49,6 +49,8 @@ interface Snapshot {
   groups: string[][]
   dq: string[]
   bonus: Record<string, number>
+  /** Restored too, so undoing inside a tie leaves it still collecting. */
+  tieInto: number | null
 }
 
 export type DraftAction =
@@ -84,6 +86,7 @@ function snapshot(state: DraftState): Snapshot {
     groups: state.groups.map((group) => [...group]),
     dq: [...state.dq],
     bonus: { ...state.bonus },
+    tieInto: state.tieInto,
   }
 }
 
@@ -151,7 +154,14 @@ export function roundDraftReducer(state: DraftState, action: DraftAction): Draft
       if (isPlaced(state, action.teamId)) return state
 
       if (state.tieArmed) {
-        if (state.tieInto === null) {
+        // Open the shared place, or join the one already open. An index that no
+        // longer points at a group opens a new one rather than matching nothing
+        // and dropping the tap on the floor, which is the one outcome here that
+        // would cost a round without saying so.
+        const collecting =
+          state.tieInto !== null && state.tieInto >= 0 && state.tieInto < state.groups.length
+
+        if (!collecting) {
           return commit(state, {
             groups: [...state.groups, [action.teamId]],
             tieInto: state.groups.length,
@@ -217,8 +227,9 @@ export function roundDraftReducer(state: DraftState, action: DraftAction): Draft
         ...state,
         ...previous,
         past,
-        // The collecting group may no longer exist after stepping back.
-        tieInto: null,
+        // Whatever the tie was collecting into at the time, which is null once
+        // stepped back past the tap that started the group.
+        tieInto: previous.tieInto ?? null,
       }
     }
 

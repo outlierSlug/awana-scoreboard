@@ -70,6 +70,23 @@ describe('recording a tie', () => {
     expect(state.groups).toEqual([[RED, BLUE], [YELLOW]])
   })
 
+  it('never drops a tap because the collecting place has gone', () => {
+    // A stale index used to match no group at all, which placed nobody and
+    // said nothing. Reachable or not, losing a tap is the one failure here
+    // that costs a round.
+    const stale: DraftState = {
+      ...emptyDraft(GAME),
+      groups: [[RED]],
+      tieArmed: true,
+      tieInto: 7,
+    }
+
+    const state = reduce(stale, tap(BLUE))
+
+    expect(state.groups).toEqual([[RED], [BLUE]])
+    expect(state.tieInto).toBe(1)
+  })
+
   it('a tie spotted late is undo, arm, retap', () => {
     // The only recovery path now that the per-row merge button is gone, so it
     // has to reach the same state the armed route does.
@@ -231,6 +248,52 @@ describe('undo', () => {
     }
 
     expect(state.past.length).toBeLessThanOrEqual(20)
+  })
+
+  it('keeps the tie collecting when a tap inside it is stepped back', () => {
+    // Undo inside a tie used to drop the group it was collecting into, so the
+    // next tap opened a place of its own while the screen still said a tie was
+    // being recorded.
+    const state = run([
+      tap(RED),
+      { type: 'toggleTieArm' },
+      tap(BLUE),
+      tap(YELLOW),
+      { type: 'undo' },
+      tap(GREEN),
+    ])
+
+    expect(state.groups).toEqual([[RED], [BLUE, GREEN]])
+    expect(startSlots(state)).toEqual([1, 2])
+  })
+
+  it('stops collecting once stepped back past the tap that opened the tie', () => {
+    // The group is gone, so the next tap starts a new one rather than joining
+    // the place above it.
+    const state = run([
+      tap(RED),
+      { type: 'toggleTieArm' },
+      tap(BLUE),
+      { type: 'undo' },
+      tap(GREEN),
+    ])
+
+    expect(state.groups).toEqual([[RED], [GREEN]])
+  })
+
+  it('steps back one tap of a finished tie rather than the whole tie', () => {
+    // Undo reverses a tap, and each team joining a tie was its own tap. Taking
+    // the wrong team back out leaves the rest of the place standing.
+    const state = run([
+      tap(RED),
+      { type: 'toggleTieArm' },
+      tap(BLUE),
+      tap(YELLOW),
+      { type: 'toggleTieArm' },
+      { type: 'undo' },
+    ])
+
+    expect(state.groups).toEqual([[RED], [BLUE]])
   })
 
   it('is not polluted by arming a tie', () => {
