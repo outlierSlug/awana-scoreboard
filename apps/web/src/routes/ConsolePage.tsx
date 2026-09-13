@@ -245,7 +245,7 @@ export function ConsolePage() {
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}
-        className="w-[min(64rem,calc(100vw-2rem))]"
+        className="w-[min(64rem,calc(100%-2rem))]"
       >
         <div className="p-5">
           {editing && (

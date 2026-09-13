@@ -3,6 +3,14 @@ import { Handshake, Minus, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { api, ApiError } from '@/lib/apiClient'
 import { useDebounced } from '@/lib/hooks/useDebounced'
 import { queryKeys } from '@/lib/queryClient'
@@ -581,61 +589,69 @@ function GamePicker({
   onGame: (id: string) => void
   onMultiplier: (n: number) => void
 }) {
+  // Where the menu has to be portalled, asked of the DOM rather than threaded
+  // down as context: whatever the trigger is inside is the right answer, and
+  // there is no arrangement of providers that can disagree with it.
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null)
+
   return (
     <div className="flex flex-wrap items-end gap-3">
-      <label className="flex min-w-0 flex-1 flex-col gap-1.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           Game
         </span>
-        <select
-          value={gameId ?? ''}
-          disabled={disabled}
-          onChange={(event) => onGame(event.target.value)}
-          className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-medium disabled:opacity-50"
-        >
-          {/* Nothing preselected. Picking the game is the first deliberate act
-              of the round, and a default is the kind of thing that goes unnoticed
-              and then has to be corrected after the fact. */}
-          <option value="" disabled>
-            Select a game...
-          </option>
-          {games.map((game) => (
-            <option key={game.id} value={game.id}>
-              {game.name}
-            </option>
-          ))}
-        </select>
-      </label>
+
+        {/* Nothing preselected. Picking the game is the first deliberate act of
+            the round, and a default is the kind of thing that goes unnoticed and
+            then has to be corrected after the fact. */}
+        <Select value={gameId ?? undefined} disabled={disabled} onValueChange={onGame}>
+          <SelectTrigger
+            ref={setTrigger}
+            className="h-11 w-full text-sm font-medium data-[size=default]:h-11"
+            aria-label="Game"
+          >
+            <SelectValue placeholder="Select a game..." />
+          </SelectTrigger>
+          <SelectContent container={trigger?.closest('dialog')}>
+            {games.map((game) => (
+              <SelectItem key={game.id} value={game.id}>
+                {game.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          Worth
+          Multiplier
         </span>
         {/* A final round or a tug-of-war is often worth double. It multiplies
             placement points only, never a bonus. */}
-        <div
-          className="flex h-11 gap-0.5 rounded-lg border border-border p-0.5"
-          role="group"
+        <ToggleGroup
+          type="single"
+          value={String(multiplier)}
+          disabled={disabled}
           aria-label="Round multiplier"
+          className="h-11 rounded-lg border border-border p-0.5"
+          onValueChange={(value) => {
+            // A group with nothing selected is not a state this has: pressing
+            // the active one again should leave the round where it is.
+            if (value) onMultiplier(Number(value))
+          }}
         >
           {[1, 2].map((value) => (
-            <button
+            <ToggleGroupItem
               key={value}
-              type="button"
-              disabled={disabled}
-              onClick={() => onMultiplier(value)}
-              aria-pressed={multiplier === value}
-              className={[
-                'min-w-12 rounded-md px-2 text-sm font-semibold transition-colors disabled:opacity-50',
-                multiplier === value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              ].join(' ')}
+              value={String(value)}
+              size="lg"
+              aria-label={`Worth ${value} times placement points`}
+              className="min-w-12 rounded-md text-sm font-semibold data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             >
               ×{value}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
     </div>
   )

@@ -119,6 +119,40 @@
 }
 
 @layer base {
+  /*
+   * The page owns its scrollbar, and keeps it.
+   *
+   * Two things take it away otherwise, and both slide the whole page sideways
+   * under someone who is mid tap. Choosing a game makes the console taller, so
+   * a scrollbar appears. Opening a menu locks scrolling, so it goes again: the
+   * menu libraries do that by setting overflow hidden on the BODY, which drops
+   * the viewport scrollbar and hands 15px back to a centered layout.
+   *
+   * scrollbar-gutter alone does not hold that space, because it only applies to
+   * an element that actually scrolls and html is overflow:visible by default.
+   * Giving html the scroll itself makes the track permanent and puts it out of
+   * reach of anything done to the body.
+   */
+  html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
+
+  /*
+   * And no compensation for it.
+   *
+   * The menu libraries lock scrolling by hiding the body's overflow and then
+   * add a margin the width of the scrollbar they believe they just removed.
+   * They did not remove it: html owns it now and the track is permanent, so
+   * that margin is 15px of pure shift. Outranked by the extra html rather than
+   * by !important alone, since the rule it beats is injected at runtime and
+   * would otherwise win on source order.
+   */
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+  }
+
   * {
     @apply border-border outline-ring/50;
     }
@@ -139,6 +173,7 @@
  * clicked and the not-allowed cursor to explain why a button is doing nothing.
  */
 @layer base {
+  a[href],
   button:not(:disabled),
   [role='button']:not([aria-disabled='true']),
   label:has(> select, > input[type='checkbox'], > input[type='radio']),
@@ -152,5 +187,42 @@
   input:disabled,
   textarea:disabled {
     cursor: not-allowed;
+  }
+
+  /*
+   * Nothing on a control is text to be selected.
+   *
+   * A scorekeeper taps the same team block twice in a second, which is a double
+   * click: the browser selects the word inside it, a few pixels of travel
+   * extends that selection across the page, and from then on the pointer is an
+   * I-beam and clicks land in the selection instead of on the buttons. It reads
+   * as the page having frozen. Only the shadcn Button guarded against this, and
+   * the blocks and toggles here are hand rolled.
+   *
+   * touch-action goes with it: without it a phone waits to see whether a second
+   * tap is a zoom before it delivers the first.
+   *
+   * Links are in here because every link in this app is a control: a session
+   * row, a board card, a nav item. None of them is prose anybody would want to
+   * copy, and the session rows are among the biggest tap targets on the site.
+   */
+  a,
+  button,
+  [role='button'],
+  label,
+  summary {
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+
+    /*
+     * And not draggable. user-select stops the text inside a control being
+     * selected, but a link is still a drag source in its own right: press
+     * "Sessions" or "Open board", move three pixels before letting go, and the
+     * browser starts dragging the URL instead of following it. The click is
+     * swallowed and the pointer is left mid gesture, which is the other half of
+     * the console feeling stuck.
+     */
+    -webkit-user-drag: none;
   }
 }

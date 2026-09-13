@@ -7,6 +7,13 @@
   problem: a phone is read at arm's length, not from thirty feet.
 */
 
+/* The board never scrolls, so a permanent track would only be a blank strip
+   down the side of the TV. */
+html:has(.board) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
 .board {
   width: 100%;
   max-width: 100%;

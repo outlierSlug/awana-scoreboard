@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarPlus, ChevronRight, ExternalLink } from 'lucide-react'
+import { CalendarIcon, CalendarPlus, ChevronRight, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
 import { SessionStatus, type Division, type SessionSummary } from '@/lib/types'
@@ -82,7 +84,10 @@ export function SessionsPage() {
             key={session.id}
             className="flex items-center gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
           >
-            <Link to={`/app/sessions/${session.id}`} className="min-w-0 flex-1">
+            {/* Text, not a target. The row already carries Open and Board, and
+                a card that is also one big link gives the same journey two
+                affordances with different hit areas. */}
+            <div className="min-w-0 flex-1">
               <span className="flex items-center gap-2.5">
                 <span className="font-semibold">{session.divisionName}</span>
                 <SessionStatusLabel status={session.status} />
@@ -91,7 +96,7 @@ export function SessionsPage() {
                 {formatDate(session.date)} · {session.roundCount}{' '}
                 {session.roundCount === 1 ? 'round' : 'rounds'}
               </span>
-            </Link>
+            </div>
 
             {session.status !== SessionStatus.Setup && (
               <Button asChild variant="ghost" size="sm">
@@ -129,7 +134,7 @@ function NewSessionForm({
   onSubmit: (divisionId: string, date: string) => void
 }) {
   const [divisionId, setDivisionId] = useState(divisions[0]?.id ?? '')
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(() => toDayString(new Date()))
 
   return (
     <form
@@ -161,16 +166,30 @@ function NewSessionForm({
           </div>
         </label>
 
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Date</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="h-11 rounded-lg border border-border bg-background px-3 text-sm"
-            required
-          />
-        </label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 justify-start px-3 font-normal"
+              >
+                <CalendarIcon />
+                {formatDate(date)}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={fromDayString(date)}
+                defaultMonth={fromDayString(date)}
+                onSelect={(picked) => picked && setDate(toDayString(picked))}
+                autoFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {error instanceof ApiError && (
@@ -187,4 +206,22 @@ function NewSessionForm({
       </div>
     </form>
   )
+}
+
+/**
+ * A session date is a calendar day, not an instant.
+ *
+ * Both directions go through local date parts rather than toISOString, which
+ * shifts by the timezone offset and lands a Friday night session on the
+ * Saturday for anyone west of UTC.
+ */
+function toDayString(value: Date): string {
+  const month = `${value.getMonth() + 1}`.padStart(2, '0')
+  const day = `${value.getDate()}`.padStart(2, '0')
+  return `${value.getFullYear()}-${month}-${day}`
+}
+
+function fromDayString(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day)
 }
