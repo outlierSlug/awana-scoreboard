@@ -133,7 +133,7 @@ public sealed class ScoringEngine : IScoringEngine
 
             foreach (var entry in members)
             {
-                awards.Add(BuildAward(entry, group.Key, slots, slotValues, share, input, config));
+                awards.Add(BuildAward(entry, slots[0], slots, slotValues, share, input, config));
             }
 
             slotCursor += members.Count;
@@ -221,9 +221,14 @@ public sealed class ScoringEngine : IScoringEngine
         _ => slotValues.Sum() / slotValues.Count,
     };
 
+    /// <param name="place">
+    /// The first slot this team's group consumed, which is its real finishing
+    /// place. NOT the group's position in the list: after a two-way tie for 1st
+    /// the next group sits at slot 3, so it is 3rd and not 2nd.
+    /// </param>
     private static TeamAward BuildAward(
         TeamEntry entry,
-        int rank,
+        int place,
         IReadOnlyList<int> slots,
         IReadOnlyList<decimal> slotValues,
         decimal share,
@@ -231,7 +236,7 @@ public sealed class ScoringEngine : IScoringEngine
         ScoringConfig config)
     {
         decimal placementPoints;
-        bool penalised;
+        bool penalized;
 
         if (entry.IsDisqualified)
         {
@@ -239,51 +244,51 @@ public sealed class ScoringEngine : IScoringEngine
             // applied, because doubling a penalty in a double round surprises
             // people and serves no purpose.
             placementPoints = config.DqRule == DqRule.CustomPenalty ? config.DqPenaltyPoints : 0m;
-            penalised = true;
+            penalized = true;
         }
         else
         {
             placementPoints = share * input.Multiplier;
-            penalised = false;
+            penalized = false;
         }
 
         var total = Round(placementPoints + entry.Bonus, config);
 
         return new TeamAward(
             entry.TeamId,
-            rank,
+            place,
             total,
             entry.IsDisqualified,
-            Explain(entry, rank, slots, slotValues, share, total, penalised, input, config));
+            Explain(entry, place, slots, slotValues, share, total, penalized, input, config));
     }
 
     private static string Explain(
         TeamEntry entry,
-        int rank,
+        int place,
         IReadOnlyList<int> slots,
         IReadOnlyList<decimal> slotValues,
         decimal share,
         decimal total,
-        bool penalised,
+        bool penalized,
         RoundInput input,
         ScoringConfig config)
     {
         var parts = new List<string>();
 
-        if (penalised)
+        if (penalized)
         {
-            parts.Add($"{Ordinal(rank)} place, disqualified, {Format(total, config)}.");
+            parts.Add($"{Ordinal(place)} place, disqualified, {Format(total, config)}.");
             parts.Add(config.DqRule == DqRule.DropToLast
                 ? "Moved behind the other teams."
                 : "Slot retained, so no team was promoted.");
         }
         else if (slots.Count == 1)
         {
-            parts.Add($"{Ordinal(rank)} place, {Format(total, config)}.");
+            parts.Add($"{Ordinal(place)} place, {Format(total, config)}.");
         }
         else
         {
-            parts.Add($"Tied for {Ordinal(rank)}{TiedWith(entry, input)}.");
+            parts.Add($"Tied for {Ordinal(place)}{TiedWith(entry, input)}.");
 
             var placeList = string.Join(" and ", slots.Select(Ordinal));
             var sum = string.Join(" + ", slotValues.Select(v => Format(v, config)));
@@ -299,7 +304,7 @@ public sealed class ScoringEngine : IScoringEngine
             });
         }
 
-        if (!penalised && input.Multiplier != 1m)
+        if (!penalized && input.Multiplier != 1m)
         {
             parts.Add($"Round multiplier {Format(input.Multiplier, config)} applied.");
         }

@@ -1,10 +1,28 @@
+using Awana.Api.Endpoints;
+using Awana.Api.Realtime;
+using Awana.Api.Services;
 using Awana.Data;
+using Awana.Scoring;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Database, migrations and reference-data seeding. Registration lives in
 // Awana.Data so the EF and Npgsql packages stay behind that boundary.
 builder.Services.AddAwanaData(builder.Configuration);
+
+// The scoring engine holds no state, so one instance serves everything.
+builder.Services.AddSingleton<IScoringEngine, ScoringEngine>();
+
+builder.Services.AddScoped<ScoreboardService>();
+builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<RoundService>();
+builder.Services.AddSingleton<IScoreboardBroadcaster, ScoreboardBroadcaster>();
+
+builder.Services.AddSignalR();
+
+// RFC 9457 problem responses for anything unhandled, so a failure never
+// reaches a client as a stack trace or an empty 500.
+builder.Services.AddProblemDetails();
 
 // Render assigns the port at runtime and passes it as $PORT.
 //
@@ -46,6 +64,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
 app.UseCors(WebCorsPolicy);
 
 // Render polls this to decide whether a deploy succeeded and whether the
@@ -58,4 +79,14 @@ app.MapGet("/api/health", () => Results.Ok(new
     utc = DateTimeOffset.UtcNow
 }));
 
+app.MapAwanaApi();
+
+// The board and the console join the same group, so they cannot disagree, and
+// a second device can be opened mid-session with no handover step.
+app.MapHub<ScoreboardHub>("/hubs/scoreboard");
+
 app.Run();
+
+// Exposed so the integration tests can boot this exact application rather than
+// a rebuilt approximation of it.
+public partial class Program;

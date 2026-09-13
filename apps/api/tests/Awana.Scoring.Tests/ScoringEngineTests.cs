@@ -65,6 +65,57 @@ public class ScoringEngineTests
         Assert.Equal(10m, outcome.PointsFor(Teams.Green));
     }
 
+    [Theory]
+    // A tie consumes more than one slot, so the team after it does NOT simply
+    // take the next ordinal. Two teams tied for 1st use slots 1 and 2, which
+    // puts the next team 3rd. Getting this wrong labels a round incorrectly on
+    // the board while the points stay right, so it is easy to miss.
+    [InlineData(1, 2, 3, 4, /* expect */ 1, 2, 3, 4)]
+    [InlineData(1, 1, 3, 4, /* expect */ 1, 1, 3, 4)]
+    [InlineData(1, 2, 2, 4, /* expect */ 1, 2, 2, 4)]
+    [InlineData(1, 2, 3, 3, /* expect */ 1, 2, 3, 3)]
+    [InlineData(1, 1, 3, 3, /* expect */ 1, 1, 3, 3)]
+    [InlineData(1, 1, 1, 4, /* expect */ 1, 1, 1, 4)]
+    [InlineData(1, 2, 2, 2, /* expect */ 1, 2, 2, 2)]
+    [InlineData(1, 1, 1, 1, /* expect */ 1, 1, 1, 1)]
+    // Gaps in the input still normalize to the slots actually consumed.
+    [InlineData(1, 2, 4, 7, /* expect */ 1, 2, 3, 4)]
+    [InlineData(2, 2, 5, 9, /* expect */ 1, 1, 3, 4)]
+    public void Finishing_place_is_the_slot_consumed_not_the_group_ordinal(
+        int red, int blue, int yellow, int green,
+        int expectedRed, int expectedBlue, int expectedYellow, int expectedGreen)
+    {
+        var outcome = ScoreFour(red, blue, yellow, green);
+
+        Assert.Equal(expectedRed, outcome.AwardFor(Teams.Red).Place);
+        Assert.Equal(expectedBlue, outcome.AwardFor(Teams.Blue).Place);
+        Assert.Equal(expectedYellow, outcome.AwardFor(Teams.Yellow).Place);
+        Assert.Equal(expectedGreen, outcome.AwardFor(Teams.Green).Place);
+    }
+
+    [Fact]
+    public void The_explanation_names_the_same_place_it_scored()
+    {
+        // Red and Blue tie for 1st, so Yellow is 3rd on 20 and Green 4th on 10.
+        var outcome = ScoreFour(1, 1, 3, 4);
+
+        Assert.Contains("3rd place", outcome.AwardFor(Teams.Yellow).Explanation);
+        Assert.Equal(20m, outcome.PointsFor(Teams.Yellow));
+
+        Assert.Contains("4th place", outcome.AwardFor(Teams.Green).Explanation);
+        Assert.Equal(10m, outcome.PointsFor(Teams.Green));
+    }
+
+    [Fact]
+    public void A_tie_below_another_tie_is_named_by_its_own_slot()
+    {
+        // Red and Blue tie for 1st; Yellow and Green tie for 3rd, not 2nd.
+        var outcome = ScoreFour(1, 1, 3, 3);
+
+        Assert.Contains("Tied for 3rd", outcome.AwardFor(Teams.Yellow).Explanation);
+        Assert.Equal(15m, outcome.PointsFor(Teams.Yellow));
+    }
+
     // ---------------------------------------------------------- disqualified
 
     [Fact]

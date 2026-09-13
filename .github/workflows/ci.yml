@@ -41,6 +41,12 @@ jobs:
       - name: Build
         run: dotnet build apps/api/Awana.slnx --no-restore --configuration Release
 
+      # The integration tests start a real Postgres via Testcontainers, because
+      # what they check IS database behavior: a filtered unique index, a
+      # transaction, and cascade rules. An in-memory provider would pass them
+      # while the real thing failed. GitHub's ubuntu runners ship with Docker,
+      # so this needs no extra setup, but it is why the API job takes a minute
+      # rather than seconds.
       - name: Test
         run: dotnet test apps/api/Awana.slnx --no-build --configuration Release --verbosity normal
 
