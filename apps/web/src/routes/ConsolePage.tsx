@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ExternalLink, Play, RotateCcw, Square } from 'lucide-react'
 import { Link, useParams } from 'react-router'
+import { RoundEntry } from '@/components/round/RoundEntry'
 import { Button } from '@/components/ui/button'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
@@ -120,6 +121,11 @@ export function ConsolePage() {
         </div>
       )}
 
+      {data.status === SessionStatus.Running && (
+        <RoundEntry session={data} onRecorded={refresh} />
+      )}
+
+      {data.status !== SessionStatus.Running && (
       <section>
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Teams
@@ -139,6 +145,7 @@ export function ConsolePage() {
           ))}
         </ul>
       </section>
+      )}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
@@ -193,15 +200,7 @@ export function ConsolePage() {
         )}
       </section>
 
-      {data.status === SessionStatus.Running && (
-        <div className="rounded-xl border border-dashed p-5">
-          <p className="font-medium">Round entry is next.</p>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            The tap-in-finish-order console is designed and the API behind it is live. Wiring it up
-            is the next piece of work.
-          </p>
-        </div>
-      )}
+
     </div>
   )
 }

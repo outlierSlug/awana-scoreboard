@@ -70,6 +70,13 @@ jobs:
         run: npm run lint
         working-directory: apps/web
 
+      # The round draft reducer. It holds the tap, tie, disqualify and undo
+      # logic, which is where the previous version's interaction bugs lived. It
+      # is pure, so covering it costs almost nothing.
+      - name: Test
+        run: npm run test
+        working-directory: apps/web
+
       # `npm run build` runs tsc and then vite build, so this covers both the
       # type check and the bundle that Cloudflare Pages will produce.
       - name: Type check and build
