@@ -1,16 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ExternalLink, Play, RotateCcw, Square } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { RoundEntry } from '@/components/round/RoundEntry'
+import { RoundHistory } from '@/components/round/RoundHistory'
 import { Button } from '@/components/ui/button'
+import { Modal } from '@/components/ui/Modal'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
-import { SessionStatus, type SessionDetail } from '@/lib/types'
+import { SessionStatus, type RoundSummary, type SessionDetail } from '@/lib/types'
 import { formatDate } from '@/lib/format'
 
 export function ConsolePage() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
+
+  // The round open in the correction dialog. It is saved over in place when
+  // the dialog is submitted, and closing the dialog changes nothing.
+  const [editing, setEditing] = useState<{ round: RoundSummary; label: string } | null>(null)
 
   const session = useQuery<SessionDetail>({
     queryKey: queryKeys.session(id ?? ''),
@@ -22,6 +29,12 @@ export function ConsolePage() {
     await queryClient.invalidateQueries({ queryKey: queryKeys.session(id!) })
     await queryClient.invalidateQueries({ queryKey: queryKeys.sessions() })
   }
+
+  const clearRound = useMutation({
+    mutationFn: ({ round, reason }: { round: RoundSummary; reason: string }) =>
+      api.voidRound(round.id, reason),
+    onSuccess: refresh,
+  })
 
   const start = useMutation({ mutationFn: () => api.startSession(id!), onSuccess: refresh })
   const finish = useMutation({ mutationFn: () => api.finishSession(id!), onSuccess: refresh })
@@ -47,7 +60,8 @@ export function ConsolePage() {
 
   const data = session.data
   const pending = start.isPending || finish.isPending || reopen.isPending
-  const error = start.error ?? finish.error ?? reopen.error
+  const roundPending = clearRound.isPending
+  const error = start.error ?? finish.error ?? reopen.error ?? clearRound.error
   const liveRounds = data.rounds.filter((round) => !round.isVoided)
 
   return (
@@ -67,7 +81,7 @@ export function ConsolePage() {
               {formatDate(data.date)} · {liveRounds.length}{' '}
               {liveRounds.length === 1 ? 'round' : 'rounds'} recorded
               {data.rounds.length !== liveRounds.length &&
-                `, ${data.rounds.length - liveRounds.length} voided`}
+                `, ${data.rounds.length - liveRounds.length} cleared`}
             </p>
           </div>
 
@@ -122,7 +136,12 @@ export function ConsolePage() {
       )}
 
       {data.status === SessionStatus.Running && (
-        <RoundEntry session={data} onRecorded={refresh} />
+        <RoundEntry
+          session={data}
+          // The dialog on top gets the keyboard while it is open.
+          shortcuts={editing === null}
+          onDone={refresh}
+        />
       )}
 
       {data.status !== SessionStatus.Running && (
@@ -147,59 +166,34 @@ export function ConsolePage() {
       </section>
       )}
 
-      <section>
-        <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-          Rounds
-        </h2>
+      <RoundHistory
+        rounds={data.rounds}
+        editable={data.status === SessionStatus.Running}
+        busy={roundPending}
+        onClear={(round, reason) => clearRound.mutate({ round, reason })}
+        onEdit={(round, label) => setEditing({ round, label })}
+      />
 
-        {data.rounds.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No rounds recorded yet.
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {data.rounds.map((round) => (
-              <li
-                key={round.id}
-                className={[
-                  'rounded-xl p-4 ring-1',
-                  round.isVoided ? 'bg-muted/50 ring-transparent' : 'bg-card ring-foreground/10',
-                ].join(' ')}
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span
-                    className={[
-                      'font-semibold',
-                      round.isVoided ? 'text-muted-foreground line-through' : '',
-                    ].join(' ')}
-                  >
-                    Round {round.roundNumber} · {round.gameName}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {round.isVoided ? `Voided · ${round.voidReason}` : null}
-                    {!round.isVoided && round.multiplier !== 1 ? `×${round.multiplier}` : null}
-                  </span>
-                </div>
-
-                {!round.isVoided && (
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                    {round.teams.map((team) => (
-                      <span key={team.teamId}>
-                        {team.teamName}{' '}
-                        <span className="font-semibold text-foreground tabular-nums">
-                          {Math.round(team.points)}
-                        </span>
-                        {team.isDisqualified ? ' (DQ)' : ''}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
+      <Modal
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        className="w-[min(64rem,calc(100vw-2rem))]"
+      >
+        <div className="p-5">
+          {editing && (
+            <RoundEntry
+              session={data}
+              editing={editing.round}
+              editingLabel={editing.label}
+              onDone={async () => {
+                setEditing(null)
+                await refresh()
+              }}
+              onCancel={() => setEditing(null)}
+            />
+          )}
+        </div>
+      </Modal>
 
     </div>
   )

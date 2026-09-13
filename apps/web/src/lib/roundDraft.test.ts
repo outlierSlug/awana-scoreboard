@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest'
 import {
   blockingReason,
   emptyDraft,
+  fromRound,
   placedTeams,
   roundDraftReducer as reduce,
+  slotOf,
+  startSlots,
   toEntries,
   type DraftAction,
   type DraftState,
 } from './roundDraft'
+import type { RoundSummary, RoundTeam } from './types'
 
 const RED = 'red'
 const BLUE = 'blue'
@@ -37,11 +41,12 @@ describe('tapping teams in finish order', () => {
     expect(state.groups).toEqual([[RED]])
   })
 
-  it('ignores a team that is marked absent', () => {
-    const state = run([{ type: 'toggleAbsent', teamId: GREEN }, tap(GREEN)])
+  it('does nothing until a game has been chosen', () => {
+    // Otherwise the round sits unsendable for a reason that is off screen.
+    const noGame = emptyDraft(null)
+    const state = run([tap(RED), tap(BLUE)], noGame)
 
-    expect(placedTeams(state)).toEqual([])
-    expect(state.absent).toEqual([GREEN])
+    expect(state.groups).toEqual([])
   })
 })
 
@@ -65,45 +70,58 @@ describe('recording a tie', () => {
     expect(state.groups).toEqual([[RED, BLUE], [YELLOW]])
   })
 
-  it('tieUp merges a row into the one above it, for a tie noticed afterwards', () => {
-    const state = run([tap(RED), tap(BLUE), { type: 'tieUp', groupIndex: 1 }])
-
-    expect(state.groups).toEqual([[RED, BLUE]])
-  })
-
-  it('reaches the same state whichever way the tie was recorded', () => {
+  it('a tie spotted late is undo, arm, retap', () => {
+    // The only recovery path now that the per-row merge button is gone, so it
+    // has to reach the same state the armed route does.
+    const late = run([
+      tap(RED),
+      tap(BLUE),
+      { type: 'undo' },
+      { type: 'undo' },
+      { type: 'toggleTieArm' },
+      tap(RED),
+      tap(BLUE),
+    ])
     const armed = run([{ type: 'toggleTieArm' }, tap(RED), tap(BLUE)])
-    const afterwards = run([tap(RED), tap(BLUE), { type: 'tieUp', groupIndex: 1 }])
 
-    expect(armed.groups).toEqual(afterwards.groups)
-  })
-
-  it('refuses to tie the first row upwards', () => {
-    const before = run([tap(RED), tap(BLUE)])
-    const after = reduce(before, { type: 'tieUp', groupIndex: 0 })
-
-    expect(after).toBe(before)
+    expect(late.groups).toEqual(armed.groups)
   })
 })
 
-describe('reordering', () => {
-  it('swaps a row with the one above', () => {
-    const state = run([tap(RED), tap(BLUE), { type: 'move', groupIndex: 1, direction: 'up' }])
+describe('finishing places', () => {
+  it('a tie consumes both slots, so the next team is third', () => {
+    const state = run([{ type: 'toggleTieArm' }, tap(RED), tap(BLUE), { type: 'toggleTieArm' }, tap(YELLOW)])
 
-    expect(state.groups).toEqual([[BLUE], [RED]])
+    expect(startSlots(state)).toEqual([1, 3])
   })
 
-  it('swaps a row with the one below', () => {
-    const state = run([tap(RED), tap(BLUE), { type: 'move', groupIndex: 0, direction: 'down' }])
+  it('tied teams share the same place', () => {
+    const state = run([tap(RED), { type: 'toggleTieArm' }, tap(BLUE), tap(YELLOW)])
 
-    expect(state.groups).toEqual([[BLUE], [RED]])
+    // The complaint this fixes: two teams tied for 2nd were numbered 2 and 3.
+    expect(slotOf(state, BLUE)).toBe(2)
+    expect(slotOf(state, YELLOW)).toBe(2)
   })
 
-  it('does nothing at either end', () => {
-    const before = run([tap(RED), tap(BLUE)])
+  it('reports no place for a team not yet tapped', () => {
+    const state = run([tap(RED)])
+    expect(slotOf(state, GREEN)).toBeNull()
+  })
 
-    expect(reduce(before, { type: 'move', groupIndex: 0, direction: 'up' })).toBe(before)
-    expect(reduce(before, { type: 'move', groupIndex: 1, direction: 'down' })).toBe(before)
+  it('sends the same places it shows', () => {
+    const state = run([
+      { type: 'toggleTieArm' },
+      tap(RED),
+      tap(BLUE),
+      { type: 'toggleTieArm' },
+      tap(YELLOW),
+    ])
+
+    const entries = toEntries(state)
+
+    expect(entries.find((e) => e.teamId === RED)?.place).toBe(1)
+    expect(entries.find((e) => e.teamId === BLUE)?.place).toBe(1)
+    expect(entries.find((e) => e.teamId === YELLOW)?.place).toBe(3)
   })
 })
 
@@ -114,8 +132,15 @@ describe('corrections', () => {
     expect(state.dq).toEqual([RED])
     expect(state.groups).toEqual([[RED], [BLUE]])
 
-    const undone = reduce(state, { type: 'toggleDq', teamId: RED })
-    expect(undone.dq).toEqual([])
+    expect(reduce(state, { type: 'toggleDq', teamId: RED }).dq).toEqual([])
+  })
+
+  it('a disqualified team keeps its slot, so nobody behind is promoted', () => {
+    const state = run([tap(RED), tap(BLUE), { type: 'toggleDq', teamId: RED }])
+    const sent = toEntries(state)
+
+    expect(sent.find((e) => e.teamId === RED)?.place).toBe(1)
+    expect(sent.find((e) => e.teamId === BLUE)?.place).toBe(2)
   })
 
   it('removes a team and collapses the empty place', () => {
@@ -137,20 +162,16 @@ describe('corrections', () => {
     expect(state.groups).toEqual([[BLUE], [YELLOW]])
   })
 
-  it('marking a team absent takes it out of the finish order', () => {
-    // The two must never disagree about whether a team took part.
-    const state = run([tap(RED), tap(BLUE), { type: 'toggleAbsent', teamId: RED }])
-
-    expect(state.groups).toEqual([[BLUE]])
-    expect(state.absent).toEqual([RED])
-  })
-
   it('clears a bonus rather than storing a zero', () => {
     const set = run([tap(RED), { type: 'setBonus', teamId: RED, points: 20 }])
     expect(set.bonus).toEqual({ [RED]: 20 })
 
-    const cleared = reduce(set, { type: 'setBonus', teamId: RED, points: 0 })
-    expect(cleared.bonus).toEqual({})
+    expect(reduce(set, { type: 'setBonus', teamId: RED, points: 0 }).bonus).toEqual({})
+  })
+
+  it('accepts a typed bonus that is not a round ten', () => {
+    const state = run([tap(RED), { type: 'setBonus', teamId: RED, points: 15 }])
+    expect(state.bonus[RED]).toBe(15)
   })
 })
 
@@ -163,16 +184,38 @@ describe('undo', () => {
 
   it('composes across ties and disqualifications', () => {
     const state = run([
+      { type: 'toggleTieArm' },
       tap(RED),
       tap(BLUE),
-      { type: 'tieUp', groupIndex: 1 },
+      { type: 'toggleTieArm' },
       { type: 'toggleDq', teamId: RED },
       { type: 'undo' },
       { type: 'undo' },
     ])
 
-    expect(state.groups).toEqual([[RED], [BLUE]])
+    expect(state.groups).toEqual([[RED]])
     expect(state.dq).toEqual([])
+  })
+
+  it('reverses the last tap even after the multiplier was changed', () => {
+    // The multiplier is a setting, not round content. Undo exists to reverse
+    // taps, and stepping back through settings makes it useless for that.
+    const state = run([
+      tap(RED),
+      tap(BLUE),
+      { type: 'setMultiplier', multiplier: 2 },
+      { type: 'undo' },
+    ])
+
+    expect(state.groups).toEqual([[RED]])
+    expect(state.multiplier).toBe(2)
+  })
+
+  it('reverses the last tap even after the game was changed', () => {
+    const state = run([tap(RED), tap(BLUE), { type: 'setGame', gameId: 'tug' }, { type: 'undo' }])
+
+    expect(state.groups).toEqual([[RED]])
+    expect(state.gameId).toBe('tug')
   })
 
   it('does nothing on an untouched draft', () => {
@@ -181,19 +224,16 @@ describe('undo', () => {
   })
 
   it('keeps the history bounded', () => {
-    // Twenty steps is plenty for a round, and an unbounded stack on a phone
-    // left open all evening is a slow leak.
+    // An unbounded stack on a phone left open all evening is a slow leak.
     let state = emptyDraft(GAME)
     for (let i = 0; i < 40; i++) {
-      state = reduce(state, { type: 'setMultiplier', multiplier: i % 2 === 0 ? 1 : 2 })
+      state = reduce(state, { type: 'setBonus', teamId: RED, points: i + 1 })
     }
 
     expect(state.past.length).toBeLessThanOrEqual(20)
   })
 
   it('is not polluted by arming a tie', () => {
-    // Arming changes nothing about the round, so stepping back through mode
-    // changes would make undo useless for actual mistakes.
     const state = run([tap(RED), { type: 'toggleTieArm' }, { type: 'undo' }])
 
     expect(state.groups).toEqual([])
@@ -218,65 +258,95 @@ describe('reset', () => {
 
 describe('blockingReason', () => {
   it('asks for a game first', () => {
-    expect(blockingReason(emptyDraft(null), ALL)).toBe('Pick a game')
+    expect(blockingReason(emptyDraft(null), ALL)).toBe('Pick a game to start')
   })
 
   it('asks for a first tap', () => {
     expect(blockingReason(emptyDraft(GAME), ALL)).toBe('Tap a team to start')
   })
 
-  it('waits until every team is accounted for', () => {
-    const state = run([tap(RED), tap(BLUE), tap(YELLOW)])
-    expect(blockingReason(state, ALL)).not.toBeNull()
+  it('will not send while a tie is still being collected', () => {
+    const state = run([tap(RED), tap(BLUE), tap(YELLOW), { type: 'toggleTieArm' }, tap(GREEN)])
+    expect(blockingReason(state, ALL)).toBe('Finish the tie first')
+  })
+
+  it('names how many teams are outstanding', () => {
+    expect(blockingReason(run([tap(RED)]), ALL)).toBe('Waiting on 3 teams')
+    expect(blockingReason(run([tap(RED), tap(BLUE), tap(YELLOW)]), ALL)).toBe(
+      'Waiting on the last team',
+    )
   })
 
   it('clears once every team is placed', () => {
     const state = run([tap(RED), tap(BLUE), tap(YELLOW), tap(GREEN)])
     expect(blockingReason(state, ALL)).toBeNull()
-  })
-
-  it('counts an absent team as accounted for', () => {
-    const state = run([tap(RED), tap(BLUE), tap(YELLOW), { type: 'toggleAbsent', teamId: GREEN }])
-    expect(blockingReason(state, ALL)).toBeNull()
+    expect(placedTeams(state)).toHaveLength(4)
   })
 })
 
-describe('toEntries', () => {
-  it('gives tied teams the same place', () => {
-    const state = run([
-      { type: 'toggleTieArm' },
-      tap(RED),
-      tap(BLUE),
-      { type: 'toggleTieArm' },
-      tap(YELLOW),
-    ])
-
-    const entries = toEntries(state)
-
-    expect(entries.find((e) => e.teamId === RED)?.place).toBe(1)
-    expect(entries.find((e) => e.teamId === BLUE)?.place).toBe(1)
-    expect(entries.find((e) => e.teamId === YELLOW)?.place).toBe(2)
+describe('reopening a recorded round', () => {
+  const team = (teamId: string, place: number | null, extra: Partial<RoundTeam> = {}): RoundTeam => ({
+    teamId,
+    teamName: teamId,
+    place,
+    isDisqualified: false,
+    points: 0,
+    bonusPoints: 0,
+    explanation: '',
+    ...extra,
   })
 
-  it('sends an absent team with a null place rather than omitting it', () => {
-    const state = run([tap(RED), { type: 'toggleAbsent', teamId: GREEN }])
-    const green = toEntries(state).find((e) => e.teamId === GREEN)
-
-    expect(green).toBeDefined()
-    expect(green?.place).toBeNull()
+  const round = (teams: RoundTeam[], multiplier = 1): RoundSummary => ({
+    id: 'r1',
+    roundNumber: 3,
+    gameId: GAME,
+    gameName: 'Baton Relay',
+    multiplier,
+    isVoided: false,
+    voidReason: null,
+    teams,
   })
 
-  it('carries disqualification and bonus through', () => {
-    const state = run([
-      tap(RED),
-      tap(BLUE),
-      { type: 'toggleDq', teamId: RED },
-      { type: 'setBonus', teamId: BLUE, points: 20 },
-    ])
+  it('restores the finish order regardless of the order teams arrive in', () => {
+    const state = fromRound(round([team(YELLOW, 3), team(RED, 1), team(BLUE, 2)]))
 
-    const entries = toEntries(state)
+    expect(state.groups).toEqual([[RED], [BLUE], [YELLOW]])
+  })
 
-    expect(entries.find((e) => e.teamId === RED)?.isDisqualified).toBe(true)
-    expect(entries.find((e) => e.teamId === BLUE)?.bonus).toBe(20)
+  it('restores a tie as one shared place', () => {
+    const state = fromRound(round([team(RED, 1), team(BLUE, 1), team(YELLOW, 3)]))
+
+    expect(state.groups).toEqual([[RED, BLUE], [YELLOW]])
+    expect(startSlots(state)).toEqual([1, 3])
+  })
+
+  it('restores the game, multiplier, disqualifications and bonuses', () => {
+    const state = fromRound(
+      round([team(RED, 1, { bonusPoints: 20 }), team(BLUE, 2, { isDisqualified: true })], 2),
+    )
+
+    expect(state.gameId).toBe(GAME)
+    expect(state.multiplier).toBe(2)
+    expect(state.dq).toEqual([BLUE])
+    expect(state.bonus).toEqual({ [RED]: 20 })
+  })
+
+  it('round trips back to the same entries', () => {
+    // What makes a correction safe: reopening a round and confirming it
+    // unchanged has to send exactly what is already recorded.
+    const original = run([{ type: 'toggleTieArm' }, tap(RED), tap(BLUE), { type: 'toggleTieArm' }, tap(YELLOW)])
+    const recorded = round(
+      toEntries(original).map((e) => team(e.teamId, e.place, { isDisqualified: e.isDisqualified })),
+    )
+
+    expect(toEntries(fromRound(recorded))).toEqual(toEntries(original))
+  })
+
+  it('starts with a clean undo stack', () => {
+    // Undo steps back through this session's taps, not into a state that was
+    // never on screen.
+    const state = fromRound(round([team(RED, 1)]))
+
+    expect(state.past).toEqual([])
   })
 })

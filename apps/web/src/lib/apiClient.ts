@@ -9,6 +9,7 @@ import type {
   Scoreboard,
   SessionDetail,
   SessionSummary,
+  UpdateRoundRequest,
 } from './types'
 
 /**
@@ -129,6 +130,10 @@ export const api = {
 
   recordRound: (sessionId: string, body: CreateRoundRequest) =>
     request<RoundRecorded>('POST', `/api/sessions/${sessionId}/rounds`, body),
+
+  /** Corrects a recorded round in place. It keeps its id and its number. */
+  updateRound: (roundId: string, body: UpdateRoundRequest) =>
+    request<RoundRecorded>('PUT', `/api/rounds/${roundId}`, body),
 
   voidRound: (roundId: string, reason: string) =>
     request<Scoreboard>('POST', `/api/rounds/${roundId}/void`, { reason }),

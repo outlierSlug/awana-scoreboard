@@ -18,18 +18,22 @@ export function AppShell() {
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
-          <Link to="/" className="flex items-center gap-2 font-semibold">
+          <Link to="/" className="flex shrink-0 items-center gap-2 font-semibold">
             <ClipboardList className="size-5" />
-            <span>Awana Scoreboard</span>
+            {/* The wordmark is the first thing to go on a narrow phone. The
+                icon still gets you home, and the screen title says where you
+                are. */}
+            <span className="hidden sm:inline">Awana Scoreboard</span>
           </Link>
 
           <nav className="flex items-center gap-1">
             <ShellLink to="/app/sessions">Sessions</ShellLink>
           </nav>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex min-w-0 items-center gap-3">
             <ConnectionDot
-              className="text-xs text-muted-foreground"
+              className="min-w-0 text-xs text-muted-foreground"
+              labelClassName="hidden truncate sm:inline"
               state={state}
               lastMessageAt={lastMessageAt}
             />

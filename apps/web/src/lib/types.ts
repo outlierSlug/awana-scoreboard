@@ -131,6 +131,13 @@ export interface CreateRoundRequest {
   entries: RoundEntryInput[]
 }
 
+/** The same shape as recording, minus the idempotency key: the round exists. */
+export interface UpdateRoundRequest {
+  gameId: string
+  multiplier: number
+  entries: RoundEntryInput[]
+}
+
 export interface PreviewRequest {
   gameId: string
   multiplier: number

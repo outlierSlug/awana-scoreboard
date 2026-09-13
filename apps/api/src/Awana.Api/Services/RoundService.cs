@@ -188,8 +188,10 @@ public class RoundService(
     public async Task<ServiceResult<RoundRecordedDto>> UpdateAsync(
         Guid roundId, UpdateRoundRequest request, Guid? userId, CancellationToken ct = default)
     {
+        // Deliberately without the results: an edit replaces every one of them,
+        // and loading them only to delete them through the change tracker is
+        // what made this fail. See the delete below.
         var round = await db.Rounds
-            .Include(r => r.Results)
             .Include(r => r.Session)
             .FirstOrDefaultAsync(r => r.Id == roundId, ct);
 
@@ -223,17 +225,29 @@ public class RoundService(
 
         var outcome = engine.Score(input, config);
 
-        db.RoundResults.RemoveRange(round.Results);
-        round.Results.Clear();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        // Clear the old results in one statement, outside the change tracker.
+        //
+        // Two reasons, both of which broke a tracked delete-then-insert here.
+        // round_results is unique on (round_id, team_id), and one SaveChanges
+        // does not promise to order deletes ahead of inserts for the same
+        // table. And marking a loaded result Deleted makes EF remove it from
+        // round.Results as it goes, so removing the range while enumerating
+        // that same collection left rows behind. The transaction keeps the
+        // round from being left with no results if the insert fails.
+        await db.RoundResults.Where(r => r.RoundId == round.Id).ExecuteDeleteAsync(ct);
+
         round.GameId = request.GameId;
         round.PointMultiplier = request.Multiplier;
 
-        AttachResults(round, outcome, request.Entries);
+        db.RoundResults.AddRange(AttachResults(round, outcome, request.Entries));
 
         session.Version++;
         AddAudit(session, userId, "round.edited", nameof(Round), round.Id, new { round.RoundNumber });
 
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         var dto = await ToRecordedAsync(round, ct);
         await broadcaster.ScoreboardUpdatedAsync(dto.Scoreboard, ct);
@@ -318,16 +332,23 @@ public class RoundService(
                 teams.TryGetValue(e.TeamId, out var t) ? t.Name : null)).ToList(),
             multiplier);
 
-    private static void AttachResults(
+    /// <returns>
+    /// The results created, so a caller holding an already tracked round can
+    /// add them to the set itself. Round ids are client generated, so EF reads
+    /// a child appearing on a tracked parent's collection as an existing row to
+    /// update rather than a new one to insert.
+    /// </returns>
+    private static List<RoundResult> AttachResults(
         Round round, ScoringOutcome outcome, IReadOnlyList<RoundEntryRequest> entries)
     {
         var byTeam = entries.ToDictionary(e => e.TeamId);
+        var created = new List<RoundResult>(outcome.Awards.Count);
 
         foreach (var award in outcome.Awards)
         {
             var request = byTeam[award.TeamId];
 
-            round.Results.Add(new RoundResult
+            var result = new RoundResult
             {
                 RoundId = round.Id,
                 TeamId = award.TeamId,
@@ -340,8 +361,13 @@ public class RoundService(
                 BonusPoints = request.Bonus,
                 BonusReason = request.BonusReason,
                 Explanation = award.Explanation,
-            });
+            };
+
+            round.Results.Add(result);
+            created.Add(result);
         }
+
+        return created;
     }
 
     private static IReadOnlyList<RoundTeamDto> ToAwardDtos(

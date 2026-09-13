@@ -35,10 +35,13 @@ export function ConnectionDot({
   state,
   lastMessageAt,
   className,
+  labelClassName,
 }: {
   state: ConnectionState
   lastMessageAt: Date | null
   className?: string
+  /** Lets a cramped header hide the words and keep the dot. */
+  labelClassName?: string
 }) {
   const [now, setNow] = useState(() => Date.now())
 
@@ -61,7 +64,7 @@ export function ConnectionDot({
           flexShrink: 0,
         }}
       />
-      <span>
+      <span className={labelClassName}>
         {LABEL[state]}
         {state === 'live' && elapsed ? ` · updated ${elapsed}` : null}
         {state !== 'live' && elapsed ? ` · last update ${elapsed}` : null}

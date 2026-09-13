@@ -5,8 +5,8 @@ using Awana.Api.Contracts;
 namespace Awana.Api.Tests;
 
 /// <summary>
-/// These four tests exist because of four specific defects in the previous
-/// version. Each one asserts the behavior that was missing then.
+/// Each of these asserts behavior that was missing or broken at some point.
+/// The first four came from defects in the previous version.
 /// </summary>
 [Collection(nameof(ApiCollection))]
 public class RoundLifecycleTests(ApiFixture fixture)
@@ -163,5 +163,50 @@ public class RoundLifecycleTests(ApiFixture fixture)
         var board = (await response.Content.ReadFromJsonAsync<ScoreboardDto>())!;
         Assert.Equal(4, board.Standings.Count);
         Assert.Equal(40m, board.Standings[0].Points);
+    }
+
+    // ------------------------------------------------------------------- 5
+
+    [Fact]
+    public async Task Editing_a_round_rescores_it_in_place()
+    {
+        // A correction has to keep the round's identity. Voiding and recording
+        // a replacement renumbers the night and loses the round if the
+        // scorekeeper backs out halfway, so the console edits in place.
+        var client = Client;
+        var (divisionId, gameId, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 10, 30));
+        await StartAsync(client, session.Id);
+
+        var created = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/rounds", CleanRound(gameId, teams));
+        var before = (await created.Content.ReadFromJsonAsync<RoundRecordedDto>())!;
+
+        // The same four teams in the opposite order, which is the common
+        // correction: the places were entered backwards.
+        var reversed = new UpdateRoundRequest(
+            GameId: gameId,
+            Multiplier: 2m,
+            Entries: Enumerable.Reverse(teams).Select((id, i) => new RoundEntryRequest(id, i + 1, false, 0m, null)).ToList());
+
+        var response = await client.PutAsJsonAsync($"/api/rounds/{before.RoundId}", reversed);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var after = (await response.Content.ReadFromJsonAsync<RoundRecordedDto>())!;
+
+        Assert.Equal(before.RoundId, after.RoundId);
+        Assert.Equal(before.RoundNumber, after.RoundNumber);
+
+        // Rescored, not appended: one result per team, at the new multiplier.
+        Assert.Equal(4, after.Awards.Count);
+        Assert.Equal(80m, after.Awards.Single(a => a.TeamId == teams[3]).Points);
+        Assert.Equal(20m, after.Awards.Single(a => a.TeamId == teams[0]).Points);
+
+        // And the standings agree, so no stale result rows were left behind.
+        Assert.Equal(80m, after.Scoreboard.Standings.Single(s => s.TeamId == teams[3]).Points);
+        Assert.Equal(20m, after.Scoreboard.Standings.Single(s => s.TeamId == teams[0]).Points);
+        Assert.Equal(1, after.Scoreboard.RoundCount);
     }
 }

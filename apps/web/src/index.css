@@ -129,3 +129,28 @@
     @apply font-sans;
     }
 }
+
+/*
+ * Cursors.
+ *
+ * Tailwind's reset leaves buttons on the default arrow, which reads as "not a
+ * control" on a laptop. The console is used on a phone and on a laptop at the
+ * side of the gym, and the laptop half needs the pointer to tell what can be
+ * clicked and the not-allowed cursor to explain why a button is doing nothing.
+ */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  label:has(> select, > input[type='checkbox'], > input[type='radio']),
+  select:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+  }
+}

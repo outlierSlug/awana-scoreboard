@@ -1,48 +1,67 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronsUp,
-  Minus,
-  Plus,
-  RotateCcw,
-  X,
-} from 'lucide-react'
+import { Handshake, Minus, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { api, ApiError } from '@/lib/apiClient'
 import { useDebounced } from '@/lib/hooks/useDebounced'
 import { queryKeys } from '@/lib/queryClient'
 import {
   blockingReason,
   emptyDraft,
+  fromRound,
   placedTeams,
   roundDraftReducer,
+  slotOf,
+  startSlots,
   toEntries,
+  type DraftAction,
   type DraftState,
 } from '@/lib/roundDraft'
-import type { Game, Preview, RoundRecorded, SessionDetail, SessionTeam } from '@/lib/types'
+import type {
+  Game,
+  Preview,
+  RoundRecorded,
+  RoundSummary,
+  SessionDetail,
+  SessionTeam,
+} from '@/lib/types'
 
-const BONUS_STEP = 5
+const BONUS_STEP = 10
 const PREVIEW_DEBOUNCE_MS = 250
+const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th']
 
-/**
- * Round entry.
- *
- * The design rule underneath all of this: there are no modes to set BEFORE
- * tapping, except one you can opt into. Tap teams as they cross the line, then
- * correct what needs correcting on the row it belongs to. A tie you already
- * know about can be armed first, because that is how it gets announced.
- */
+function ordinal(place: number): string {
+  return ORDINALS[place - 1] ?? `${place}th`
+}
+
 export function RoundEntry({
   session,
-  onRecorded,
+  editing,
+  editingLabel,
+  shortcuts = true,
+  onDone,
+  onCancel,
 }: {
   session: SessionDetail
-  onRecorded: () => void
+  /**
+   * A recorded round being corrected, rather than a new one being entered.
+   *
+   * Editing saves over the round in place, so it keeps its id, its number and
+   * its position in the night. Nothing happens until save, which is what makes
+   * backing out of a correction free.
+   */
+  editing?: RoundSummary
+  /** How the round being corrected is numbered on screen. */
+  editingLabel?: string
+  /** Off for a form sitting behind a modal, so both do not answer one keypress. */
+  shortcuts?: boolean
+  onDone: () => void
+  onCancel?: () => void
 }) {
   const [draft, dispatch] = useReducer(roundDraftReducer, undefined, () => emptyDraft())
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
   const games = useQuery<Game[]>({
     queryKey: queryKeys.games(session.divisionId),
@@ -50,46 +69,50 @@ export function RoundEntry({
     staleTime: Infinity,
   })
 
+  const initialDraft = useMemo(() => (editing ? fromRound(editing) : null), [editing])
+
   const teamIds = useMemo(() => session.teams.map((team) => team.teamId), [session.teams])
   const blocked = blockingReason(draft, teamIds)
 
-  // Restore a draft the browser threw away. A phone locking in a pocket
-  // mid-round must not cost the taps already made.
-  const storageKey = `awana.draft.${session.id}`
+  // While a tie is being collected, everything except the team blocks is out of
+  // reach. Undoing or resetting halfway through building a shared place leaves
+  // the draft somewhere nobody meant to put it.
+  const locked = draft.tieArmed
+
+  /* -------------------------------------------------- draft persistence */
+
+  // A correction is not persisted: it starts from what is recorded, and
+  // abandoning it has to leave both the round and the next round's draft alone.
+  const storageKey = editing ? null : `awana.draft.${session.id}`
   const restored = useRef(false)
 
   useEffect(() => {
     if (restored.current) return
     restored.current = true
 
+    if (initialDraft) {
+      dispatch({ type: 'restore', state: initialDraft })
+      return
+    }
+
     try {
-      const saved = sessionStorage.getItem(storageKey)
+      const saved = storageKey && sessionStorage.getItem(storageKey)
       if (saved) dispatch({ type: 'restore', state: JSON.parse(saved) as DraftState })
     } catch {
       // A corrupt or unreadable draft is not worth failing over. Start fresh.
     }
-  }, [storageKey])
+  }, [storageKey, initialDraft])
 
   useEffect(() => {
+    if (!storageKey) return
+
     try {
-      if (draft.groups.length === 0 && draft.absent.length === 0) {
-        sessionStorage.removeItem(storageKey)
-      } else {
-        sessionStorage.setItem(storageKey, JSON.stringify(draft))
-      }
+      if (draft.groups.length === 0) sessionStorage.removeItem(storageKey)
+      else sessionStorage.setItem(storageKey, JSON.stringify(draft))
     } catch {
       // Losing the ability to restore is survivable; failing the round is not.
     }
   }, [draft, storageKey])
-
-  // Default to the game most likely to be next: the one just played, since a
-  // game is usually run several times in a row.
-  useEffect(() => {
-    if (draft.gameId || !games.data?.length) return
-
-    const lastPlayed = [...session.rounds].reverse().find((round) => !round.isVoided)
-    dispatch({ type: 'setGame', gameId: lastPlayed?.gameId ?? games.data[0].id })
-  }, [draft.gameId, games.data, session.rounds])
 
   /* ------------------------------------------------------- live preview */
 
@@ -109,9 +132,8 @@ export function RoundEntry({
         signal,
       ),
     enabled: Boolean(settled.gameId) && settled.entries.length > 0,
-    // The server is the only authority on points. Recomputing them in the
-    // browser would be a second implementation that eventually disagrees with
-    // the number actually stored.
+    // The server is the only authority on points. Recomputing them here would
+    // be a second implementation that eventually disagrees with what is stored.
     staleTime: Infinity,
   })
 
@@ -123,28 +145,46 @@ export function RoundEntry({
 
   const record = useMutation<RoundRecorded>({
     mutationFn: () =>
-      api.recordRound(session.id, {
-        clientRequestId: requestId.current,
-        gameId: draft.gameId!,
-        multiplier: draft.multiplier,
-        entries,
-      }),
+      editing
+        ? api.updateRound(editing.id, {
+            gameId: draft.gameId!,
+            multiplier: draft.multiplier,
+            entries,
+          })
+        : api.recordRound(session.id, {
+            clientRequestId: requestId.current,
+            gameId: draft.gameId!,
+            multiplier: draft.multiplier,
+            entries,
+          }),
     onSuccess: () => {
       requestId.current = crypto.randomUUID()
-      dispatch({ type: 'reset' })
-      try {
-        sessionStorage.removeItem(storageKey)
-      } catch {
-        // Nothing to do.
+      setConfirming(false)
+
+      if (!editing) {
+        dispatch({ type: 'reset' })
+        try {
+          if (storageKey) sessionStorage.removeItem(storageKey)
+        } catch {
+          // Nothing to do.
+        }
       }
-      onRecorded()
+
+      onDone()
     },
   })
 
-  const confirm = useCallback(() => {
-    if (blocked || record.isPending) return
-    record.mutate()
-  }, [blocked, record])
+  const ready = !blocked && !record.isPending
+
+  const submit = useCallback(() => {
+    if (!ready) return
+
+    // Opening the editor was already the deliberate act for a correction, and
+    // a second dialog on top of the first one only reads as an obstacle. A new
+    // round has no such gate, so it gets the confirmation step.
+    if (editing) record.mutate()
+    else setConfirming(true)
+  }, [ready, editing, record])
 
   /* ---------------------------------------------------------- shortcuts */
 
@@ -152,13 +192,21 @@ export function RoundEntry({
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
-      if (event.metaKey && event.key.toLowerCase() !== 'z') return
+      if (!shortcuts) return
+
+      // The dialog owns the keyboard while it is up. Enter belongs to its
+      // confirm button, not to a second attempt at opening it.
+      if (confirming) return
 
       const index = Number(event.key) - 1
       if (index >= 0 && index < session.teams.length) {
         dispatch({ type: 'tapTeam', teamId: session.teams[index].teamId })
         return
       }
+
+      // Only placing teams and ending the tie are reachable while collecting
+      // one, matching exactly what the buttons allow.
+      if (locked && event.key.toLowerCase() !== 't') return
 
       switch (event.key.toLowerCase()) {
         case 't':
@@ -177,17 +225,14 @@ export function RoundEntry({
           break
         case 'enter':
           event.preventDefault()
-          confirm()
-          break
-        case 'escape':
-          dispatch({ type: 'reset' })
+          submit()
           break
       }
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [draft, session.teams, confirm])
+  }, [draft, session.teams, submit, locked, confirming, shortcuts])
 
   /* -------------------------------------------------------------- render */
 
@@ -195,115 +240,136 @@ export function RoundEntry({
     () => new Map(session.teams.map((team) => [team.teamId, team])),
     [session.teams],
   )
-  const placed = placedTeams(draft)
   const pointsFor = new Map(preview.data?.awards.map((a) => [a.teamId, a.points]) ?? [])
+  const slots = startSlots(draft)
+
+  // Highest first, which is the order the board will show and therefore the
+  // order the scorekeeper is checking against.
+  const standingsPreview = [...session.teams].sort(
+    (a, b) => (pointsFor.get(b.teamId) ?? -1) - (pointsFor.get(a.teamId) ?? -1),
+  )
+
+  const gameName = games.data?.find((game) => game.id === draft.gameId)?.name ?? 'this game'
 
   return (
-    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
-      <div className="flex flex-col gap-5">
-        <GameAndMultiplier
+    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+      {editingLabel && (
+        <h2 className="text-lg font-bold tracking-tight lg:col-span-2">
+          Editing {editingLabel}
+        </h2>
+      )}
+
+      <div className="mx-auto flex w-full max-w-md flex-col gap-5">
+        <GamePicker
           games={games.data ?? []}
           gameId={draft.gameId}
           multiplier={draft.multiplier}
+          disabled={locked}
           onGame={(gameId) => dispatch({ type: 'setGame', gameId })}
           onMultiplier={(multiplier) => dispatch({ type: 'setMultiplier', multiplier })}
         />
 
         <div>
-          <div className="mb-2.5 flex items-center gap-2">
-            <span
-              className={[
-                'text-xs font-semibold tracking-wide uppercase',
-                draft.tieArmed ? 'text-foreground' : 'text-muted-foreground',
-              ].join(' ')}
-            >
-              {draft.tieArmed ? 'Tap teams that tied' : 'Tap in finish order'}
-            </span>
+          <span className="mb-2.5 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Tap in finish order
+          </span>
 
-            <div className="ml-auto flex gap-2">
-              <Button
-                size="sm"
-                variant={draft.tieArmed ? 'default' : 'outline'}
-                onClick={() => dispatch({ type: 'toggleTieArm' })}
-              >
-                <ChevronsUp />
-                {draft.tieArmed ? 'Done' : 'Tie'}
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={draft.past.length === 0}
-                onClick={() => dispatch({ type: 'undo' })}
-              >
-                <RotateCcw />
-                Undo
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-2">
-            {session.teams.map((team) => (
-              <TeamBlock
-                key={team.teamId}
-                team={team}
-                order={placed.indexOf(team.teamId)}
-                absent={draft.absent.includes(team.teamId)}
-                arming={draft.tieArmed}
-                onTap={() => dispatch({ type: 'tapTeam', teamId: team.teamId })}
-                onToggleAbsent={() => dispatch({ type: 'toggleAbsent', teamId: team.teamId })}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-2.5 flex items-center justify-between">
-            <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              Finish order
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={draft.groups.length === 0}
-              onClick={() => dispatch({ type: 'reset' })}
-            >
-              Clear
-            </Button>
-          </div>
-
-          {draft.groups.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Tap a team as it crosses the line.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {draft.groups.map((group, index) => (
-                <DraftRow
-                  key={group.join('-')}
-                  group={group}
-                  index={index}
-                  startSlot={draft.groups.slice(0, index).reduce((n, g) => n + g.length, 0) + 1}
-                  total={draft.groups.length}
-                  teams={byId}
-                  dq={draft.dq}
-                  bonus={draft.bonus}
-                  points={pointsFor}
-                  dispatch={dispatch}
+          {draft.gameId ? (
+            <div className="grid grid-cols-2 gap-2.5">
+              {session.teams.map((team) => (
+                <TeamBlock
+                  key={team.teamId}
+                  team={team}
+                  place={slotOf(draft, team.teamId)}
+                  arming={locked}
+                  onTap={() => dispatch({ type: 'tapTeam', teamId: team.teamId })}
                 />
               ))}
-            </ul>
+            </div>
+          ) : (
+            <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Choose a game above to start recording this round.
+            </p>
           )}
+
+          {/* Directly under the blocks they act on, rather than off in a header
+              row, because these three are used mid tap and not before. */}
+          <div className="mt-2.5 grid grid-cols-3 gap-2">
+            <Button
+              variant={locked ? 'default' : 'outline'}
+              aria-pressed={locked}
+              disabled={!draft.gameId}
+              onClick={() => dispatch({ type: 'toggleTieArm' })}
+            >
+              <Handshake />
+              Tie
+            </Button>
+
+            <Button
+              variant="outline"
+              disabled={locked || draft.past.length === 0}
+              onClick={() => dispatch({ type: 'undo' })}
+            >
+              <RotateCcw />
+              Undo
+            </Button>
+
+            <Button
+              variant="destructive"
+              disabled={locked || draft.groups.length === 0}
+              onClick={() => dispatch({ type: 'reset' })}
+            >
+              <Trash2 />
+              Reset
+            </Button>
+          </div>
         </div>
+
+        {draft.groups.length > 0 && (
+          <div>
+            <span className="mb-2.5 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Finish order
+            </span>
+
+            <ul className="flex flex-col gap-2">
+              {draft.groups.map((group, index) => (
+                <li key={group.join('-')} className="rounded-xl border p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-sm font-bold">{ordinal(slots[index])}</span>
+                    {group.length > 1 && (
+                      <span className="text-xs text-muted-foreground">
+                        {group.length} teams tied
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {group.map((teamId) => (
+                      <TeamLine
+                        key={teamId}
+                        team={byId.get(teamId)}
+                        teamId={teamId}
+                        dq={draft.dq.includes(teamId)}
+                        bonus={draft.bonus[teamId] ?? 0}
+                        points={pointsFor.get(teamId)}
+                        disabled={locked}
+                        dispatch={dispatch}
+                      />
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-col gap-3 lg:sticky lg:top-20">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-3 lg:sticky lg:top-20 lg:max-w-none">
         <PreviewPanel
-          teams={session.teams}
+          teams={standingsPreview}
           preview={preview.data}
           error={preview.error}
           isPending={preview.isFetching}
-          empty={draft.groups.length === 0}
         />
 
         {record.error instanceof ApiError && (
@@ -312,13 +378,27 @@ export function RoundEntry({
           </p>
         )}
 
-        <Button size="lg" className="h-14 text-base" disabled={Boolean(blocked) || record.isPending} onClick={confirm}>
-          {record.isPending ? 'Sending...' : (blocked ?? 'Confirm round')}
+        <Button
+          size="lg"
+          onClick={submit}
+          disabled={!ready}
+          className={[
+            'h-14 text-base',
+            // Ready to send looks different from waiting on something, from
+            // across the room and out of the corner of an eye.
+            ready ? 'text-lg font-bold shadow-lg shadow-primary/25 ring-2 ring-primary/25' : '',
+          ].join(' ')}
+        >
+          {record.isPending
+            ? 'Saving...'
+            : (blocked ?? (editing ? 'Save changes' : 'Confirm round'))}
         </Button>
 
-        <p className="text-center text-xs text-muted-foreground">
-          Nothing reaches the board until you confirm.
-        </p>
+        {onCancel && (
+          <Button variant="ghost" size="lg" disabled={record.isPending} onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
 
         <button
           type="button"
@@ -331,14 +411,56 @@ export function RoundEntry({
         {showShortcuts && (
           <dl className="hidden gap-x-4 gap-y-1.5 text-xs text-muted-foreground lg:grid lg:grid-cols-[auto_1fr]">
             <Shortcut keys="1 – 4" what="Place the next team" />
-            <Shortcut keys="T" what="Arm or end a tie" />
+            <Shortcut keys="T" what="Start or end a tie" />
             <Shortcut keys="D" what="Disqualify the last placed" />
             <Shortcut keys="Ctrl Z" what="Undo" />
             <Shortcut keys="Enter" what="Confirm round" />
-            <Shortcut keys="Esc" what="Clear" />
           </dl>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirming}
+        title="Confirm this round?"
+        confirmLabel="Confirm round"
+        cancelLabel="Keep editing"
+        busy={record.isPending}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => record.mutate()}
+      >
+        <p>
+          {gameName}
+          {draft.multiplier !== 1 && `, worth ×${draft.multiplier}`}. This goes on the board right
+          away.
+        </p>
+
+        <ul className="mt-3 flex flex-col gap-1.5">
+          {draft.groups.flatMap((group, index) =>
+            group.map((teamId) => (
+              <li key={teamId} className="flex items-center gap-2.5">
+                <span className="w-8 text-xs font-semibold tabular-nums">
+                  {ordinal(slots[index])}
+                </span>
+                <span
+                  className="inline-flex h-6 min-w-16 items-center justify-center rounded-md px-2 text-xs font-bold"
+                  style={{
+                    background: byId.get(teamId)?.colorHex,
+                    color: byId.get(teamId)?.textOnColorHex,
+                  }}
+                >
+                  {byId.get(teamId)?.name}
+                </span>
+                {draft.dq.includes(teamId) && (
+                  <span className="text-xs font-bold text-destructive">DQ</span>
+                )}
+                <span className="ml-auto text-sm font-bold tabular-nums text-foreground">
+                  {pointsFor.has(teamId) ? Math.round(pointsFor.get(teamId)!) : '...'}
+                </span>
+              </li>
+            )),
+          )}
+        </ul>
+      </ConfirmDialog>
     </section>
   )
 }
@@ -354,28 +476,39 @@ function Shortcut({ keys, what }: { keys: string; what: string }) {
   )
 }
 
-function GameAndMultiplier({
+function GamePicker({
   games,
   gameId,
   multiplier,
+  disabled,
   onGame,
   onMultiplier,
 }: {
   games: Game[]
   gameId: string | null
   multiplier: number
+  disabled: boolean
   onGame: (id: string) => void
   onMultiplier: (n: number) => void
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/60 p-3">
-      <label className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="sr-only">Game</span>
+    <div className="flex flex-wrap items-end gap-3">
+      <label className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          Game
+        </span>
         <select
           value={gameId ?? ''}
+          disabled={disabled}
           onChange={(event) => onGame(event.target.value)}
-          className="h-10 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-medium"
+          className="h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 text-sm font-medium disabled:opacity-50"
         >
+          {/* Nothing preselected. Picking the game is the first deliberate act
+              of the round, and a default is the kind of thing that goes unnoticed
+              and then has to be corrected after the fact. */}
+          <option value="" disabled>
+            Select a game...
+          </option>
           {games.map((game) => (
             <option key={game.id} value={game.id}>
               {game.name}
@@ -384,25 +517,35 @@ function GameAndMultiplier({
         </select>
       </label>
 
-      {/* A final round or a tug-of-war is often worth double. It multiplies
-          placement points only, never a bonus. */}
-      <div className="flex gap-0.5 rounded-lg bg-background p-0.5" role="group" aria-label="Round multiplier">
-        {[1, 2].map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => onMultiplier(value)}
-            aria-pressed={multiplier === value}
-            className={[
-              'h-9 min-w-11 rounded-md text-sm font-semibold transition-colors',
-              multiplier === value
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            ].join(' ')}
-          >
-            ×{value}
-          </button>
-        ))}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          Worth
+        </span>
+        {/* A final round or a tug-of-war is often worth double. It multiplies
+            placement points only, never a bonus. */}
+        <div
+          className="flex h-11 gap-0.5 rounded-lg border border-border p-0.5"
+          role="group"
+          aria-label="Round multiplier"
+        >
+          {[1, 2].map((value) => (
+            <button
+              key={value}
+              type="button"
+              disabled={disabled}
+              onClick={() => onMultiplier(value)}
+              aria-pressed={multiplier === value}
+              className={[
+                'min-w-12 rounded-md px-2 text-sm font-semibold transition-colors disabled:opacity-50',
+                multiplier === value
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
+              ].join(' ')}
+            >
+              ×{value}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -410,275 +553,198 @@ function GameAndMultiplier({
 
 function TeamBlock({
   team,
-  order,
-  absent,
+  place,
   arming,
   onTap,
-  onToggleAbsent,
 }: {
   team: SessionTeam
-  order: number
-  absent: boolean
+  /** The finishing place, which tied teams SHARE. Null until tapped. */
+  place: number | null
   arming: boolean
   onTap: () => void
-  onToggleAbsent: () => void
 }) {
-  const spent = order >= 0 || absent
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={onTap}
-        disabled={spent}
-        className="flex h-28 w-full items-center justify-center rounded-2xl text-xl font-bold transition-colors disabled:cursor-default"
-        style={{
-          // A placed block lightens toward white while keeping its own hue, so
-          // the teams still to come stay solid and obvious beside it. Not
-          // grayscale, which turns yellow to tan, and not opacity, which takes
-          // yellow below readable contrast.
-          background: spent
-            ? `color-mix(in oklch, ${team.colorHex}, white 62%)`
-            : team.colorHex,
-          color: spent ? 'oklch(0.145 0 0)' : team.textOnColorHex,
-          border: arming && !spent ? '3px solid oklch(0.145 0 0)' : '3px solid transparent',
-        }}
-      >
-        {team.name}
-      </button>
-
-      {order >= 0 && (
-        <span
-          className="pointer-events-none absolute top-2 right-2 flex size-6 items-center justify-center rounded-full text-xs font-bold"
-          style={{ background: 'rgb(0 0 0 / 12%)', color: 'oklch(0.145 0 0)' }}
-        >
-          {order + 1}
-        </span>
-      )}
-
-      {/* Only offered while the team is still available. Once it is in the
-          finish order, Remove on its row is the control that makes sense. */}
-      {order < 0 && (
-        <button
-          type="button"
-          onClick={onToggleAbsent}
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md px-2 py-0.5 text-[11px] font-semibold"
-          style={{
-            background: absent ? 'oklch(0.145 0 0)' : 'rgb(0 0 0 / 10%)',
-            color: absent ? 'oklch(0.985 0 0)' : team.textOnColorHex,
-          }}
-        >
-          {absent ? 'Not playing' : 'Sit out'}
-        </button>
-      )}
-    </div>
-  )
-}
-
-function DraftRow({
-  group,
-  index,
-  startSlot,
-  total,
-  teams,
-  dq,
-  bonus,
-  points,
-  dispatch,
-}: {
-  group: string[]
-  index: number
-  /**
-   * The first finishing slot this group occupies, which is its real place.
-   * NOT its position in the list: two teams sharing first consume slots 1 and
-   * 2, so the next row is 3rd. Labelling it 2nd here would disagree with the
-   * place the engine actually records.
-   */
-  startSlot: number
-  total: number
-  teams: Map<string, SessionTeam>
-  dq: string[]
-  bonus: Record<string, number>
-  points: Map<string, number>
-  dispatch: React.Dispatch<import('@/lib/roundDraft').DraftAction>
-}) {
-  const ordinal = ['1st', '2nd', '3rd', '4th', '5th', '6th'][startSlot - 1] ?? `${startSlot}th`
-  const shown = points.get(group[0])
-
-  return (
-    <li className="rounded-xl border p-2.5">
-      <div className="flex items-center gap-2.5">
-        <span className="w-8 shrink-0 text-xs font-bold text-muted-foreground">{ordinal}</span>
-
-        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-          {group.map((teamId) => {
-            const team = teams.get(teamId)
-            const out = dq.includes(teamId)
-            return (
-              <span
-                key={teamId}
-                className="inline-flex h-7 items-center rounded-lg px-2.5 text-sm font-bold"
-                style={{
-                  background: team?.colorHex,
-                  color: team?.textOnColorHex,
-                  textDecoration: out ? 'line-through' : undefined,
-                  textDecorationThickness: out ? '2px' : undefined,
-                }}
-              >
-                {team?.name ?? 'Unknown'}
-              </span>
-            )
-          })}
-        </div>
-
-        {group.length === 1 && (
-          <span className="shrink-0 text-lg font-bold tabular-nums">
-            {shown === undefined ? '' : Math.round(shown)}
-          </span>
-        )}
-      </div>
-
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <IconChip
-          label="Move up"
-          disabled={index === 0}
-          onClick={() => dispatch({ type: 'move', groupIndex: index, direction: 'up' })}
-        >
-          <ArrowUp className="size-3.5" />
-        </IconChip>
-
-        <IconChip
-          label="Move down"
-          disabled={index === total - 1}
-          onClick={() => dispatch({ type: 'move', groupIndex: index, direction: 'down' })}
-        >
-          <ArrowDown className="size-3.5" />
-        </IconChip>
-
-        {index > 0 && (
-          <Chip onClick={() => dispatch({ type: 'tieUp', groupIndex: index })}>
-            <ChevronsUp className="size-3.5" />
-            Tie up
-          </Chip>
-        )}
-
-        {/* A single team's controls sit on the same line as the ordering ones.
-            A shared place puts each team on its own labelled line below, so a
-            remove button is never ambiguous about who it removes. */}
-        {group.length === 1 && (
-          <TeamControls
-            teamId={group[0]}
-            dq={dq.includes(group[0])}
-            bonus={bonus[group[0]] ?? 0}
-            dispatch={dispatch}
-          />
-        )}
-      </div>
-
-      {group.length > 1 && (
-        <div className="mt-2 flex flex-col gap-1.5 border-t pt-2">
-          {group.map((teamId) => (
-            <div key={teamId} className="flex flex-wrap items-center gap-1.5">
-              <span
-                className="inline-flex h-7 min-w-16 items-center justify-center rounded-md px-2 text-xs font-bold"
-                style={{ background: teams.get(teamId)?.colorHex, color: teams.get(teamId)?.textOnColorHex }}
-              >
-                {teams.get(teamId)?.name}
-              </span>
-              <TeamControls
-                teamId={teamId}
-                dq={dq.includes(teamId)}
-                bonus={bonus[teamId] ?? 0}
-                dispatch={dispatch}
-              />
-              <span className="ml-auto text-base font-bold tabular-nums">
-                {points.get(teamId) === undefined ? '' : Math.round(points.get(teamId)!)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </li>
-  )
-}
-
-/** Disqualify, bonus and remove, for exactly one team. */
-function TeamControls({
-  teamId,
-  dq,
-  bonus,
-  dispatch,
-}: {
-  teamId: string
-  dq: boolean
-  bonus: number
-  dispatch: React.Dispatch<import('@/lib/roundDraft').DraftAction>
-}) {
-  return (
-    <>
-      <Chip active={dq} tone="destructive" onClick={() => dispatch({ type: 'toggleDq', teamId })}>
-        DQ
-      </Chip>
-
-      {bonus === 0 ? (
-        <Chip onClick={() => dispatch({ type: 'setBonus', teamId, points: 10 })}>
-          <Plus className="size-3.5" />
-          Bonus
-        </Chip>
-      ) : (
-        // A stepper rather than a fixed value, because the archive shows the
-        // bonus was sometimes 10 and sometimes 20, and a future game will award
-        // something else again.
-        <span className="inline-flex h-9 items-center gap-1 rounded-lg border px-1">
-          <button
-            type="button"
-            aria-label="Less bonus"
-            className="flex size-7 items-center justify-center rounded-md hover:bg-muted"
-            onClick={() =>
-              dispatch({ type: 'setBonus', teamId, points: Math.max(0, bonus - BONUS_STEP) })
-            }
-          >
-            <Minus className="size-3.5" />
-          </button>
-          <span className="min-w-9 text-center text-sm font-bold tabular-nums">+{bonus}</span>
-          <button
-            type="button"
-            aria-label="More bonus"
-            className="flex size-7 items-center justify-center rounded-md hover:bg-muted"
-            onClick={() => dispatch({ type: 'setBonus', teamId, points: bonus + BONUS_STEP })}
-          >
-            <Plus className="size-3.5" />
-          </button>
-        </span>
-      )}
-
-      <IconChip label="Remove from the round" onClick={() => dispatch({ type: 'remove', teamId })}>
-        <X className="size-3.5" />
-      </IconChip>
-    </>
-  )
-}
-
-function Chip({
-  children,
-  onClick,
-  active,
-  tone,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  active?: boolean
-  tone?: 'destructive'
-}) {
-  const destructive = tone === 'destructive'
+  const placed = place !== null
 
   return (
     <button
       type="button"
+      onClick={onTap}
+      disabled={placed}
+      data-team-block
+      className="relative flex aspect-square w-full items-center justify-center rounded-2xl text-xl font-bold transition-colors"
+      style={{
+        // A placed block lightens toward white while keeping its own hue, so
+        // the teams still to come stay solid and obvious beside it. Not
+        // grayscale, which turns yellow to tan, and not opacity, which takes
+        // yellow below readable contrast.
+        background: placed ? `color-mix(in oklch, ${team.colorHex}, white 62%)` : team.colorHex,
+        color: placed ? 'oklch(0.145 0 0)' : team.textOnColorHex,
+        // Marks which blocks a tie can still take. Drawn INSIDE the block, in
+        // the team's own text color: an outline on the edge disappears against
+        // whichever page background happens to be behind it, which is how a
+        // black one went missing in the dark theme.
+        boxShadow:
+          arming && !placed
+            ? `inset 0 0 0 5px ${team.colorHex}, inset 0 0 0 10px ${team.textOnColorHex}`
+            : undefined,
+      }}
+    >
+      {team.name}
+
+      {placed && (
+        <span
+          className="pointer-events-none absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-full text-sm font-bold"
+          style={{ background: 'rgb(0 0 0 / 12%)' }}
+        >
+          {place}
+        </span>
+      )}
+    </button>
+  )
+}
+
+/** One team inside a finishing place: what happened to it, and what it scored. */
+function TeamLine({
+  team,
+  teamId,
+  dq,
+  bonus,
+  points,
+  disabled,
+  dispatch,
+}: {
+  team: SessionTeam | undefined
+  teamId: string
+  dq: boolean
+  bonus: number
+  points: number | undefined
+  disabled: boolean
+  dispatch: React.Dispatch<DraftAction>
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span
+        className="inline-flex h-8 min-w-18 items-center justify-center rounded-lg px-2.5 text-sm font-bold"
+        style={{
+          background: team?.colorHex,
+          color: team?.textOnColorHex,
+          textDecoration: dq ? 'line-through' : undefined,
+          textDecorationThickness: dq ? '2px' : undefined,
+        }}
+      >
+        {team?.name ?? 'Unknown'}
+      </span>
+
+      {/* Covers a rule break and a team that never finished alike: the slot is
+          kept, nothing is scored, and nobody behind moves up. */}
+      <Toggle on={dq} disabled={disabled} onClick={() => dispatch({ type: 'toggleDq', teamId })}>
+        DQ
+      </Toggle>
+
+      <BonusControl
+        value={bonus}
+        disabled={disabled}
+        onChange={(points) => dispatch({ type: 'setBonus', teamId, points })}
+      />
+
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label="Remove from the round"
+        title="Remove from the round"
+        onClick={() => dispatch({ type: 'remove', teamId })}
+        className="flex size-8 items-center justify-center rounded-lg border text-muted-foreground hover:bg-muted disabled:opacity-40"
+      >
+        <X className="size-3.5" />
+      </button>
+
+      <span className="ml-auto text-base font-bold tabular-nums">
+        {points === undefined ? '' : Math.round(points)}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Bonus points.
+ *
+ * Steps of ten, because that is what the bonus bucket has historically been
+ * worth, but the value is typeable: the archive shows it varied, and a future
+ * game will award something else again.
+ */
+function BonusControl({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: number
+  disabled: boolean
+  onChange: (points: number) => void
+}) {
+  if (value === 0) {
+    return (
+      <Toggle on={false} disabled={disabled} onClick={() => onChange(BONUS_STEP)}>
+        <Plus className="size-3.5" />
+        Bonus
+      </Toggle>
+    )
+  }
+
+  return (
+    <span className="inline-flex h-8 items-center rounded-lg border">
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label="Less bonus"
+        onClick={() => onChange(Math.max(0, value - BONUS_STEP))}
+        className="flex size-7 items-center justify-center rounded-l-lg hover:bg-muted disabled:opacity-40"
+      >
+        <Minus className="size-3.5" />
+      </button>
+
+      <input
+        type="number"
+        inputMode="numeric"
+        value={value}
+        disabled={disabled}
+        aria-label="Bonus points"
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="h-full w-12 border-x bg-transparent text-center text-sm font-bold tabular-nums outline-none disabled:opacity-40"
+      />
+
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label="More bonus"
+        onClick={() => onChange(value + BONUS_STEP)}
+        className="flex size-7 items-center justify-center rounded-r-lg hover:bg-muted disabled:opacity-40"
+      >
+        <Plus className="size-3.5" />
+      </button>
+    </span>
+  )
+}
+
+function Toggle({
+  children,
+  on,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode
+  on: boolean
+  disabled: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
       onClick={onClick}
+      disabled={disabled}
+      aria-pressed={on}
       className={[
-        'inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors',
-        active && destructive
+        'inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-40',
+        on
           ? 'border-destructive bg-destructive/10 font-bold text-destructive'
           : 'border-border hover:bg-muted',
       ].join(' ')}
@@ -688,67 +754,28 @@ function Chip({
   )
 }
 
-function IconChip({
-  children,
-  onClick,
-  label,
-  disabled,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  label: string
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className="flex size-9 items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted disabled:opacity-35"
-    >
-      {children}
-    </button>
-  )
-}
-
-/**
- * The explanations worth reading.
- *
- * "3rd place, 20" needs no explaining, and printing four such lines buries the
- * one that does. Ties and disqualifications are the cases where the arithmetic
- * is not obvious, and they are exactly the cases that used to be argued about.
- */
-function reasoning(preview: Preview | undefined): string | null {
-  if (!preview?.awards.length) return null
-
-  const notable = [
-    ...new Set(
-      preview.awards
-        .filter((a) => a.explanation.includes('Tied') || a.isDisqualified)
-        .map((a) => a.explanation),
-    ),
-  ]
-
-  if (notable.length > 0) return notable.join(' ')
-  return 'Clean finish, no ties.'
-}
-
 function PreviewPanel({
   teams,
   preview,
   error,
   isPending,
-  empty,
 }: {
+  /** Already ordered by what this round would score. */
   teams: SessionTeam[]
   preview: Preview | undefined
   error: unknown
   isPending: boolean
-  empty: boolean
 }) {
   const byTeam = new Map(preview?.awards.map((a) => [a.teamId, a]) ?? [])
+
+  const problem =
+    error instanceof ApiError
+      ? `Points unavailable: ${error.message}`
+      : error
+        ? 'Points unavailable. Check the connection.'
+        : preview?.isValid === false
+          ? preview.errors.map((e) => e.message).join(' ')
+          : null
 
   return (
     <div className="rounded-xl border p-4">
@@ -783,25 +810,9 @@ function PreviewPanel({
         })}
       </div>
 
-      {/* The reasoning, in words, before anything is saved. This is the direct
-          answer to scoring that used to change depending on the kind of tie:
-          the scorekeeper confirms points, not just an order. */}
-      <p
-        className={[
-          'mt-3 border-t pt-3 text-xs leading-relaxed',
-          error ? 'text-destructive' : 'text-muted-foreground',
-        ].join(' ')}
-      >
-        {error
-          ? error instanceof ApiError
-            ? `Points unavailable: ${error.message}`
-            : 'Points unavailable. Check the connection.'
-          : empty
-          ? 'Tap a team to see what the round would score.'
-          : preview?.isValid === false
-            ? preview.errors.map((e) => e.message).join(' ')
-            : (reasoning(preview) ?? 'Working it out...')}
-      </p>
+      {problem && (
+        <p className="mt-3 border-t pt-3 text-xs leading-relaxed text-destructive">{problem}</p>
+      )}
     </div>
   )
 }
