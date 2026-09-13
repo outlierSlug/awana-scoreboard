@@ -1,4 +1,10 @@
+using Awana.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Database, migrations and reference-data seeding. Registration lives in
+// Awana.Data so the EF and Npgsql packages stay behind that boundary.
+builder.Services.AddAwanaData(builder.Configuration);
 
 // Render assigns the port at runtime and passes it as $PORT.
 //
