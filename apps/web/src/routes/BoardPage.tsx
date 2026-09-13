@@ -43,8 +43,6 @@ export function BoardPage() {
     )
   }
 
-  const notStarted = data.status === SessionStatus.Setup
-
   return (
     <div className="board">
       <header className="board-head">
@@ -70,12 +68,7 @@ export function BoardPage() {
 
       <div className="board-rows">
         {data.standings.map((team) => (
-          <TeamRow
-            key={team.teamId}
-            ref={registerRow(team.teamId)}
-            team={team}
-            showPoints={!notStarted}
-          />
+          <TeamRow key={team.teamId} ref={registerRow(team.teamId)} team={team} />
         ))}
       </div>
 
@@ -95,11 +88,9 @@ export function BoardPage() {
 function TeamRow({
   ref,
   team,
-  showPoints,
 }: {
   ref: (element: HTMLElement | null) => void
   team: Standing
-  showPoints: boolean
 }) {
   return (
     <div
@@ -125,15 +116,18 @@ function TeamRow({
         {team.rankChange < 0 && <ArrowDown />}
       </div>
 
-      <div className="board-points">{showPoints ? Math.round(team.points) : '—'}</div>
+      <div className="board-points">{Math.round(team.points)}</div>
     </div>
   )
 }
 
 /**
- * One line describing the last round only. The totals are already enormous on
- * the screen above, so repeating them here would be noise; what the room cannot
- * see is what just changed.
+ * What each team just earned, in plain words.
+ *
+ * Deliberately no round number, game name or multiplier. Those are scorekeeper
+ * data: the room already knows which game it just watched, and the totals are
+ * enormous on the screen above. The only thing the room cannot see for itself
+ * is how much that last race was worth.
  */
 function summarize(status: SessionStatus, lastRound: LastRound | null): string {
   if (status === SessionStatus.Setup) return 'Starting soon.'
@@ -141,15 +135,12 @@ function summarize(status: SessionStatus, lastRound: LastRound | null): string {
 
   const scores = lastRound.teams
     .map((team) => {
-      const points = Math.round(team.points)
-      if (team.isDisqualified) return `${team.teamName} DQ`
-      return `${team.teamName} ${points > 0 ? '+' : ''}${points}`
+      if (team.isDisqualified) return `${team.teamName} disqualified`
+      return `${team.teamName} +${Math.round(team.points)}`
     })
-    .join(' · ')
+    .join(', ')
 
-  const doubled = lastRound.multiplier !== 1 ? ` (×${lastRound.multiplier})` : ''
-
-  return `Round ${lastRound.roundNumber} · ${lastRound.gameName}${doubled} — ${scores}`
+  return `Last round: ${scores}`
 }
 
 function BoardMessage({ title, detail }: { title: string; detail: string }) {
