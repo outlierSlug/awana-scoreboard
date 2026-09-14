@@ -266,6 +266,65 @@ public class SessionService(
     }
 
 
+    // --------------------------------------------------------------- delete
+
+    /// <summary>
+    /// Removes a session that never happened.
+    /// </summary>
+    /// <remarks>
+    /// Only while nothing stands against it. Session to round is a cascade, so
+    /// deleting one that has been played would erase the night rather than
+    /// correct it, and everything else here is retired or voided instead of
+    /// deleted for exactly that reason.
+    ///
+    /// "Stands" means what it means everywhere else in the product: the round
+    /// count on the list, the board and the session summary all leave out
+    /// cleared rounds. Counting them only here made the rule invisible to the
+    /// person it was being applied to, who saw a session with no rounds and was
+    /// told it had rounds. A session whose rounds were all cleared can go, and
+    /// the audit log keeps what was done to it either way.
+    /// </remarks>
+    public async Task<ServiceResult<bool>> DeleteAsync(
+        Guid id, Guid? userId, CancellationToken ct = default)
+    {
+        var session = await db.Sessions
+            .Include(s => s.Rounds)
+            .Include(s => s.PointAdjustments)
+            .FirstOrDefaultAsync(s => s.Id == id, ct);
+
+        if (session is null) return ServiceResult<bool>.Fail(ServiceError.NotFound("Session"));
+
+        var standingRounds = session.Rounds.Count(r => r.VoidedAt is null);
+        var standingAdjustments = session.PointAdjustments.Count(a => a.VoidedAt is null);
+
+        if (standingRounds > 0 || standingAdjustments > 0)
+        {
+            return ServiceResult<bool>.Fail(ServiceError.Conflict(
+                "session_not_empty",
+                standingRounds > 0
+                    ? $"This session still has {standingRounds} {(standingRounds == 1 ? "round" : "rounds")} standing. Clear them first, or leave the session as the record of what happened."
+                    : "This session still has points adjusted on it. Clear those first, or leave the session as the record of what happened."));
+        }
+
+        // Audited before the delete, because the row it points at is about to
+        // stop existing and the log is the only place it will be mentioned.
+        AddAudit(session, userId, "session.deleted", nameof(Session), session.Id, new
+        {
+            session.PublicSlug,
+            session.Date,
+            session.Status,
+            // Named here because the rows themselves are about to go with the
+            // session, and this entry becomes the only mention of them.
+            ClearedRounds = session.Rounds.Count,
+            ClearedAdjustments = session.PointAdjustments.Count,
+        });
+
+        db.Sessions.Remove(session);
+        await db.SaveChangesAsync(ct);
+
+        return ServiceResult<bool>.Success(true);
+    }
+
     // -------------------------------------------------------- adjustments
 
     /// <summary>Matches the column, so a long reason is a 400 and not a 500.</summary>

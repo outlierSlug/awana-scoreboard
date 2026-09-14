@@ -435,4 +435,52 @@ public class RoundLifecycleTests(ApiFixture fixture)
 
         Assert.Equal(HttpStatusCode.BadRequest, absurd.StatusCode);
     }
+
+    // ------------------------------------------------------------------ 13
+
+    [Fact]
+    public async Task A_session_can_be_deleted_only_while_it_holds_nothing()
+    {
+        // Session to round is a cascade, so deleting a played session would
+        // erase the night rather than correct it. Everything else here is
+        // retired or voided for exactly that reason.
+        var client = Client;
+        var (divisionId, gameId, teams) = await fixture.FixtureIdsAsync();
+
+        var empty = await CreateSessionAsync(client, divisionId, new DateOnly(2027, 1, 8));
+        var played = await CreateSessionAsync(client, divisionId, new DateOnly(2027, 1, 15));
+
+        await StartAsync(client, played.Id);
+        await client.PostAsJsonAsync($"/api/sessions/{played.Id}/rounds", CleanRound(gameId, teams));
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await client.DeleteAsync($"/api/sessions/{empty.Id}")).StatusCode);
+
+        var refused = await client.DeleteAsync($"/api/sessions/{played.Id}");
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+
+        // And once every round has been cleared it can go, because nothing
+        // stands against it any more. Counting cleared rounds here and nowhere
+        // else told somebody looking at a session with no rounds that it had
+        // rounds, which is a rule they cannot see the inputs to.
+        var detail = (await client.GetFromJsonAsync<SessionDetailDto>($"/api/sessions/{played.Id}"))!;
+        foreach (var round in detail.Rounds)
+        {
+            await client.PostAsJsonAsync(
+                $"/api/rounds/{round.Id}/void", new VoidRoundRequest("Recorded by mistake"));
+        }
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await client.DeleteAsync($"/api/sessions/{played.Id}")).StatusCode);
+
+        // And a scorekeeper cannot delete even the empty kind.
+        var another = await CreateSessionAsync(client, divisionId, new DateOnly(2027, 1, 22));
+        using var asScorekeeper = new HttpRequestMessage(
+            HttpMethod.Delete, $"/api/sessions/{another.Id}");
+        asScorekeeper.Headers.Add(TestAuth.RoleHeader, nameof(UserRole.Scorekeeper));
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(asScorekeeper)).StatusCode);
+    }
 }

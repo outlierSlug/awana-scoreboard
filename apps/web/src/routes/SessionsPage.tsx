@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarIcon, CalendarPlus, ChevronRight, ExternalLink } from 'lucide-react'
+import { CalendarPlus, ChevronRight, ExternalLink, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import { NewSessionDialog } from '@/components/round/NewSessionDialog'
 import { Button } from '@/components/ui/button'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { useMe } from '@/lib/auth'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
@@ -14,12 +14,16 @@ import { formatDate } from '@/lib/format'
 
 export function SessionsPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
 
   // The API refuses these regardless. Hiding them keeps a scorekeeper from
   // filling in a form whose only possible ending is a permission error.
   const { can } = useMe()
   const canCreate = can(UserRole.GamesLeader)
+  const canDelete = can(UserRole.Admin)
+
+  const [deleting, setDeleting] = useState<SessionSummary | null>(null)
 
   const sessions = useQuery<SessionSummary[]>({
     queryKey: queryKeys.sessions(),
@@ -33,10 +37,38 @@ export function SessionsPage() {
   })
 
   const create = useMutation({
-    mutationFn: ({ divisionId, date }: { divisionId: string; date: string }) =>
-      api.createSession(divisionId, date),
-    onSuccess: async () => {
+    mutationFn: async ({
+      divisionId,
+      date,
+      start,
+    }: {
+      divisionId: string
+      date: string
+      start: boolean
+    }) => {
+      const session = await api.createSession(divisionId, date)
+
+      // Two calls rather than one, so both reuse an endpoint that is already
+      // tested. If the second fails the session simply stays in setup, which
+      // is a state it is allowed to be in and is visible in the list.
+      if (start) await api.startSession(session.id)
+
+      return { session, start }
+    },
+    onSuccess: async ({ session, start }) => {
       setCreating(false)
+      await queryClient.invalidateQueries({ queryKey: queryKeys.sessions() })
+
+      // Started means the games are about to begin, so the next thing wanted
+      // is the console, not the list that was just left.
+      if (start) navigate(`/app/sessions/${session.id}`)
+    },
+  })
+
+  const remove = useMutation({
+    mutationFn: (session: SessionSummary) => api.deleteSession(session.id),
+    onSuccess: async () => {
+      setDeleting(null)
       await queryClient.invalidateQueries({ queryKey: queryKeys.sessions() })
     },
   })
@@ -52,20 +84,22 @@ export function SessionsPage() {
         </div>
 
         {canCreate && (
-          <Button size="lg" onClick={() => setCreating((open) => !open)}>
+          <Button size="lg" onClick={() => setCreating(true)}>
             <CalendarPlus />
             New session
           </Button>
         )}
       </div>
 
-      {creating && canCreate && divisions.data && (
-        <NewSessionForm
+      {canCreate && divisions.data && (
+        <NewSessionDialog
+          open={creating}
+          onClose={() => setCreating(false)}
           divisions={divisions.data}
-          pending={create.isPending}
+          existing={sessions.data ?? []}
+          busy={create.isPending}
           error={create.error}
-          onCancel={() => setCreating(false)}
-          onSubmit={(divisionId, date) => create.mutate({ divisionId, date })}
+          onCreate={(divisionId, date, start) => create.mutate({ divisionId, date, start })}
         />
       )}
 
@@ -81,10 +115,34 @@ export function SessionsPage() {
         <div className="rounded-xl border border-dashed p-10 text-center">
           <p className="font-medium">No sessions yet.</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create one for tonight and start it when the games begin.
+            Make one for tonight and start it straight away.
           </p>
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete this session?"
+        confirmLabel="Delete it"
+        destructive
+        busy={remove.isPending}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => deleting && remove.mutate(deleting)}
+      >
+        <p>
+          {deleting?.divisionName} on {deleting && formatDate(deleting.date)} has no rounds
+          standing against it. Any that were already cleared go with it, and the record of who
+          did what stays in the audit log.
+        </p>
+
+        {/* A session that is not empty after all still refuses, and the reason
+            has to be readable rather than a button that quietly does nothing. */}
+        {remove.error instanceof ApiError && (
+          <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-destructive">
+            {remove.error.message}
+          </p>
+        )}
+      </ConfirmDialog>
 
       <ul className="flex flex-col gap-2">
         {sessions.data?.map((session) => (
@@ -121,6 +179,21 @@ export function SessionsPage() {
                 <ChevronRight />
               </Link>
             </Button>
+
+            {/* Only offered where it can work: the API refuses a session with
+                anything recorded against it, and a button that always fails is
+                worse than no button. */}
+            {canDelete && session.roundCount === 0 && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Delete the ${session.divisionName} session`}
+                disabled={remove.isPending}
+                onClick={() => setDeleting(session)}
+              >
+                <Trash2 />
+              </Button>
+            )}
           </li>
         ))}
       </ul>
@@ -128,108 +201,5 @@ export function SessionsPage() {
   )
 }
 
-function NewSessionForm({
-  divisions,
-  pending,
-  error,
-  onCancel,
-  onSubmit,
-}: {
-  divisions: Division[]
-  pending: boolean
-  error: unknown
-  onCancel: () => void
-  onSubmit: (divisionId: string, date: string) => void
-}) {
-  const [divisionId, setDivisionId] = useState(divisions[0]?.id ?? '')
-  const [date, setDate] = useState(() => toDayString(new Date()))
 
-  return (
-    <form
-      className="flex flex-col gap-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSubmit(divisionId, date)
-      }}
-    >
-      <div className="flex flex-col gap-4 sm:flex-row">
-        <label className="flex flex-1 flex-col gap-1.5">
-          <span className="text-sm font-medium">Division</span>
-          <div className="flex gap-2">
-            {divisions.map((division) => (
-              <button
-                key={division.id}
-                type="button"
-                onClick={() => setDivisionId(division.id)}
-                className={[
-                  'h-11 flex-1 rounded-lg border text-sm font-semibold transition-colors',
-                  division.id === divisionId
-                    ? 'border-foreground bg-primary text-primary-foreground'
-                    : 'border-border bg-background hover:bg-muted',
-                ].join(' ')}
-              >
-                {division.name}
-              </button>
-            ))}
-          </div>
-        </label>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Date</span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 justify-start px-3 font-normal"
-              >
-                <CalendarIcon />
-                {formatDate(date)}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={fromDayString(date)}
-                defaultMonth={fromDayString(date)}
-                onSelect={(picked) => picked && setDate(toDayString(picked))}
-                autoFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-      </div>
-
-      {error instanceof ApiError && (
-        <p className="text-sm text-destructive">{error.message}</p>
-      )}
-
-      <div className="flex gap-2">
-        <Button type="submit" size="lg" disabled={pending || !divisionId}>
-          {pending ? 'Creating...' : 'Create session'}
-        </Button>
-        <Button type="button" variant="ghost" size="lg" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-/**
- * A session date is a calendar day, not an instant.
- *
- * Both directions go through local date parts rather than toISOString, which
- * shifts by the timezone offset and lands a Friday night session on the
- * Saturday for anyone west of UTC.
- */
-function toDayString(value: Date): string {
-  const month = `${value.getMonth() + 1}`.padStart(2, '0')
-  const day = `${value.getDate()}`.padStart(2, '0')
-  return `${value.getFullYear()}-${month}-${day}`
-}
-
-function fromDayString(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}

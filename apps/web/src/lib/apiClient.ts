@@ -132,6 +132,9 @@ export const api = {
     request<SessionDetail>('POST', '/api/sessions', { divisionId, date }),
 
   startSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/start`),
+
+  /** Only ever a session that never happened. The API refuses the rest. */
+  deleteSession: (id: string) => request<void>('DELETE', `/api/sessions/${id}`),
   finishSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/finish`),
   reopenSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/reopen`),
 

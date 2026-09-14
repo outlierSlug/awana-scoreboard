@@ -165,6 +165,16 @@ public static class ApiEndpoints
             // one session action kept to an admin.
             .RequireAuthorization(AuthPolicies.Admin);
 
+        // Only ever a session that never happened, and only an admin's call.
+        // See DeleteAsync for why this is not the way to undo a night.
+        group.MapDelete("/{id:guid}",
+            async (Guid id, ClaimsPrincipal user, SessionService sessions, CancellationToken ct) =>
+            {
+                var result = await sessions.DeleteAsync(id, user.Id(), ct);
+                return result.Ok ? Results.NoContent() : Problems.From(result.Error!);
+            })
+            .RequireAuthorization(AuthPolicies.Admin);
+
         // Points a leader decided on, outside the games. The scorekeeper is
         // the one at the console when a leader announces one, and every
         // adjustment carries their name and a written reason.
