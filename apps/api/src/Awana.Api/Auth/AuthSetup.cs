@@ -36,9 +36,16 @@ public static class AuthSetup
         var auth = services.AddAuthentication(options =>
         {
             options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = google.IsConfigured
-                ? GoogleDefaults.AuthenticationScheme
-                : CookieAuthenticationDefaults.AuthenticationScheme;
+
+            // The cookie answers an unauthenticated request, not Google.
+            //
+            // Making Google the default challenge sends a 302 to
+            // accounts.google.com in reply to an ordinary API call: the browser
+            // follows it, CORS refuses it, and a fetch that should have been a
+            // plain 401 surfaces as a network error nobody can act on. Sign-in
+            // names the Google scheme explicitly, which is the only place a
+            // redirect to a provider belongs.
+            options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
         });
 
         auth.AddCookie(options =>

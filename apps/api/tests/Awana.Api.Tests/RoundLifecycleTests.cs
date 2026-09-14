@@ -233,6 +233,10 @@ public class RoundLifecycleTests(ApiFixture fixture)
 
         var response = await client.SendAsync(request);
 
+        // 401 and not a redirect. Once Google was configured it became the
+        // default challenge, and an ordinary API call started answering with a
+        // 302 to accounts.google.com: the browser follows it, CORS refuses it,
+        // and what should have been a plain 401 surfaces as a network error.
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 

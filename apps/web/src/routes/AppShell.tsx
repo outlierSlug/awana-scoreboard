@@ -1,6 +1,7 @@
 import { ClipboardList, LogOut } from 'lucide-react'
-import { Link, NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { ConnectionDot } from '@/components/ConnectionDot'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { useMe, useSignOut } from '@/lib/auth'
@@ -15,6 +16,7 @@ import { useHub } from '@/lib/signalr/hubContext'
  */
 export function AppShell() {
   const { state, lastMessageAt } = useHub()
+  const location = useLocation()
   const { me } = useMe()
   const signOut = useSignOut()
 
@@ -68,7 +70,11 @@ export function AppShell() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-        <Outlet />
+        {/* Keyed on the path, so moving to another screen clears a failure
+            rather than carrying it along. */}
+        <ErrorBoundary key={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   )

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ExternalLink, Flag, Play, RotateCcw } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Flag, Play, RotateCcw, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FinalStandings } from '@/components/round/FinalStandings'
+import { TeamsDialog } from '@/components/round/TeamsDialog'
 import { RoundEntry } from '@/components/round/RoundEntry'
 import { RoundHistory } from '@/components/round/RoundHistory'
 import { SessionStatusLabel } from '@/components/SessionStatusLabel'
@@ -15,6 +17,7 @@ import { queryKeys } from '@/lib/queryClient'
 import {
   SessionStatus,
   UserRole,
+  type Adjustment,
   type RoundSummary,
   type Scoreboard,
   type SessionDetail,
@@ -29,6 +32,7 @@ export function ConsolePage() {
   // the dialog is submitted, and closing the dialog changes nothing.
   const [editing, setEditing] = useState<{ round: RoundSummary; label: string } | null>(null)
   const [finishing, setFinishing] = useState(false)
+  const [teamsOpen, setTeamsOpen] = useState(false)
 
   // A tie takes over the whole page, not just the form. Everything that is not
   // a team block steps back and stops answering until the tie is closed, so
@@ -71,6 +75,24 @@ export function ConsolePage() {
     }
   }
 
+  // Each of these applies on its own, so the dialog has nothing to save.
+  const addAdjustment = useMutation({
+    mutationFn: ({ teamId, points, reason }: { teamId: string; points: number; reason: string }) =>
+      api.addAdjustment(id!, { teamId, points, reason }),
+    onSuccess: refresh,
+  })
+
+  const clearAdjustment = useMutation({
+    mutationFn: (adjustment: Adjustment) => api.voidAdjustment(adjustment.id),
+    onSuccess: refresh,
+  })
+
+  const saveHeadcount = useMutation({
+    mutationFn: (team: { teamId: string; headcount: number | null }) =>
+      api.updateAttendance(id!, { teams: [team] }),
+    onSuccess: refresh,
+  })
+
   const clearRound = useMutation({
     mutationFn: ({ round, reason }: { round: RoundSummary; reason: string }) =>
       api.voidRound(round.id, reason),
@@ -108,7 +130,16 @@ export function ConsolePage() {
   const data = session.data
   const pending = start.isPending || finish.isPending || reopen.isPending
   const roundPending = clearRound.isPending
-  const error = start.error ?? finish.error ?? reopen.error ?? clearRound.error
+  const teamsPending =
+    addAdjustment.isPending || clearAdjustment.isPending || saveHeadcount.isPending
+  const error =
+    start.error ??
+    finish.error ??
+    reopen.error ??
+    clearRound.error ??
+    addAdjustment.error ??
+    clearAdjustment.error ??
+    saveHeadcount.error
   const liveRounds = data.rounds.filter((round) => !round.isVoided)
 
   return (
@@ -144,6 +175,16 @@ export function ConsolePage() {
                 </a>
               </Button>
             )}
+
+            {/* Occasional, so behind a button rather than permanent furniture
+                around the screen that gets used every few minutes. Shown on a
+                finished session too: the adjustments are part of how those
+                final standings were arrived at, and hiding them afterwards
+                leaves a total nobody can account for. */}
+            <Button variant="outline" size="lg" onClick={() => setTeamsOpen(true)}>
+              <Users />
+              Teams
+            </Button>
 
             {data.status === SessionStatus.Setup && canRunSession && (
               <Button size="lg" disabled={pending} onClick={() => start.mutate()}>
@@ -244,15 +285,32 @@ export function ConsolePage() {
       )}
 
       <div className={recede}>
-        <RoundHistory
-          rounds={data.rounds}
-          teams={data.teams}
-          editable={data.status === SessionStatus.Running && canScore}
-          busy={roundPending}
-          onClear={(round, reason) => clearRound.mutate({ round, reason })}
-          onEdit={(round, label) => setEditing({ round, label })}
-        />
+        <ErrorBoundary label="The rounds could not be shown">
+          <RoundHistory
+            rounds={data.rounds}
+            teams={data.teams}
+            editable={data.status === SessionStatus.Running && canScore}
+            busy={roundPending}
+            onClear={(round, reason) => clearRound.mutate({ round, reason })}
+            onEdit={(round, label) => setEditing({ round, label })}
+          />
+        </ErrorBoundary>
       </div>
+
+      <TeamsDialog
+        open={teamsOpen}
+        onClose={() => setTeamsOpen(false)}
+        teams={data.teams}
+        adjustments={data.adjustments}
+        canCount={data.status !== SessionStatus.Finished && canScore}
+        canAdjust={data.status === SessionStatus.Running && canScore}
+        busy={teamsPending}
+        onSaveHeadcount={(teamId, headcount) => saveHeadcount.mutate({ teamId, headcount })}
+        onAddAdjustment={(teamId, points, reason) =>
+          addAdjustment.mutate({ teamId, points, reason })
+        }
+        onClearAdjustment={(adjustment) => clearAdjustment.mutate(adjustment)}
+      />
 
       <ConfirmDialog
         open={finishing}

@@ -1,5 +1,6 @@
 import { config } from '@/config'
 import type {
+  CreateAdjustmentRequest,
   CreateRoundRequest,
   Division,
   Game,
@@ -10,6 +11,7 @@ import type {
   SessionDetail,
   Me,
   SessionSummary,
+  UpdateAttendanceRequest,
   UpdateRoundRequest,
 } from './types'
 
@@ -157,6 +159,16 @@ export const api = {
   /** Corrects a recorded round in place. It keeps its id and its number. */
   updateRound: (roundId: string, body: UpdateRoundRequest) =>
     request<RoundRecorded>('PUT', `/api/rounds/${roundId}`, body),
+
+  // Adjustments and attendance.
+  addAdjustment: (sessionId: string, body: CreateAdjustmentRequest) =>
+    request<Scoreboard>('POST', `/api/sessions/${sessionId}/adjustments`, body),
+
+  voidAdjustment: (adjustmentId: string) =>
+    request<Scoreboard>('POST', `/api/adjustments/${adjustmentId}/void`),
+
+  updateAttendance: (sessionId: string, body: UpdateAttendanceRequest) =>
+    request<SessionDetail>('PUT', `/api/sessions/${sessionId}/attendance`, body),
 
   voidRound: (roundId: string, reason: string) =>
     request<Scoreboard>('POST', `/api/rounds/${roundId}/void`, { reason }),

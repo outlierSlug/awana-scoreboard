@@ -91,6 +91,33 @@ export interface RoundSummary {
   teams: RoundTeam[]
 }
 
+/** Points a leader decided on, outside the games. */
+export interface Adjustment {
+  id: string
+  teamId: string
+  teamName: string
+  points: number
+  reason: string
+  isVoided: boolean
+  createdAt: string
+}
+
+export interface CreateAdjustmentRequest {
+  teamId: string
+  /** Negative is a penalty. Never zero. */
+  points: number
+  reason: string
+}
+
+export interface TeamHeadcount {
+  teamId: string
+  headcount: number | null
+}
+
+export interface UpdateAttendanceRequest {
+  teams: TeamHeadcount[]
+}
+
 export interface SessionDetail {
   id: string
   slug: string
@@ -101,6 +128,7 @@ export interface SessionDetail {
   version: number
   teams: SessionTeam[]
   rounds: RoundSummary[]
+  adjustments: Adjustment[]
 }
 
 /** Roles, ordered so the UI can ask "at least this" the way the API does. */
