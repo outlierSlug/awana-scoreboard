@@ -13,7 +13,8 @@ export const queryKeys = {
   sessions: () => ['sessions'] as const,
   session: (id: string) => ['session', id] as const,
   divisions: () => ['divisions'] as const,
-  games: (divisionId?: string) => ['games', divisionId ?? 'all'] as const,
+  games: () => ['games'] as const,
+  gameCatalog: () => ['game-catalog'] as const,
 }
 
 /**

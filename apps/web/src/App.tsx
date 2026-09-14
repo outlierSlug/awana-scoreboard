@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router'
 import { AppShell } from '@/routes/AppShell'
 import { BoardPage } from '@/routes/BoardPage'
 import { ConsolePage } from '@/routes/ConsolePage'
+import { GamesPage } from '@/routes/GamesPage'
 import { HomePage } from '@/routes/HomePage'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage } from '@/routes/NotFoundPage'
@@ -31,6 +32,7 @@ export default function App() {
         <Route index element={<SessionsPage />} />
         <Route path="sessions" element={<SessionsPage />} />
         <Route path="sessions/:id" element={<ConsolePage />} />
+        <Route path="games" element={<GamesPage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

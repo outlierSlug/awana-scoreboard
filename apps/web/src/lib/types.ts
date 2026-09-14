@@ -167,11 +167,34 @@ export interface Division {
   slug: string
 }
 
+/** What the round picker needs. The catalog page uses GameDetail instead. */
 export interface Game {
   id: string
   name: string
-  isCore: boolean
-  divisionId: string | null
+}
+
+/** A game as the catalog shows it, retired ones included. */
+export interface GameDetail {
+  id: string
+  name: string
+  notes: string | null
+  /** Its place in one hand-arranged list. There are no tiers. */
+  sortOrder: number
+  isActive: boolean
+  /**
+   * A gate, not a statistic. Zero is what makes a game deletable; anything else
+   * means retiring is the only option that keeps history readable. Not shown:
+   * how often a game gets played belongs to week to week tracking.
+   */
+  roundCount: number
+  /** Came with the app. Shown as provenance only: it is edited like any other. */
+  isSeeded: boolean
+}
+
+/** The editable half of a game. The same shape creates one and updates one. */
+export interface SaveGameRequest {
+  name: string
+  notes: string | null
 }
 
 export interface RoundEntryInput {

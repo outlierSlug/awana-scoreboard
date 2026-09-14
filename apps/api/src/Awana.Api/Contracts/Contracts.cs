@@ -158,7 +158,50 @@ public sealed record RoundSummaryDto(
     string? VoidReason,
     IReadOnlyList<RoundTeamDto> Teams);
 
-public sealed record GameDto(Guid Id, string Name, bool IsCore, Guid? DivisionId);
+/// <summary>What the round picker needs, and nothing else.</summary>
+public sealed record GameDto(Guid Id, string Name);
+
+/// <summary>
+/// A game as the catalog shows it, retired ones included.
+/// </summary>
+/// <param name="RoundCount">
+/// A gate, not a statistic. Zero means the game can be deleted outright;
+/// anything else means retiring is the only honest option, because rounds point
+/// at it. The catalog does not show this number and should not start: how often
+/// a game gets played is week to week tracking, which is its own screen.
+/// </param>
+/// <param name="IsSeeded">
+/// True for a game the seeder created. Shown so that a leader editing the
+/// catalog can tell which entries came with the app, and nothing more: a
+/// seeded game is edited, retired and renamed exactly like any other.
+/// </param>
+public sealed record GameDetailDto(
+    Guid Id,
+    string Name,
+    string? Notes,
+    int SortOrder,
+    bool IsActive,
+    int RoundCount,
+    bool IsSeeded);
+
+/// <summary>
+/// The editable half of a game. Used for both create and update, because the
+/// form is the same one either way and two near-identical records would drift.
+/// </summary>
+public sealed record SaveGameRequest(
+    string Name,
+    string? Notes);
+
+/// <summary>
+/// The whole catalog's order, as ids in the order they should appear.
+/// </summary>
+/// <remarks>
+/// Sent whole rather than as a move, so the result cannot depend on what the
+/// server thought the order was. Two leaders reordering at once then means the
+/// second one wins, rather than the two interleaving into something neither
+/// asked for.
+/// </remarks>
+public sealed record ReorderGamesRequest(IReadOnlyList<Guid> Ids);
 
 /// <summary>
 /// Points a leader decided on, outside the games.

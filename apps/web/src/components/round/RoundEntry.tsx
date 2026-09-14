@@ -105,8 +105,8 @@ export function RoundEntry({
   const [confirming, setConfirming] = useState(false)
 
   const games = useQuery<Game[]>({
-    queryKey: queryKeys.games(session.divisionId),
-    queryFn: ({ signal }) => api.games(session.divisionId, signal),
+    queryKey: queryKeys.games(),
+    queryFn: ({ signal }) => api.games(signal),
     staleTime: Infinity,
   })
 

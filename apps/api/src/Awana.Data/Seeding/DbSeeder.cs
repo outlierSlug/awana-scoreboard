@@ -25,7 +25,7 @@ public class DbSeeder(AwanaDbContext db, ILogger<DbSeeder> logger)
         var divisions = await SeedDivisionsAsync(church, ct);
         await SeedTeamsAsync(church, divisions, ct);
         await SeedScoringProfileAsync(church, ct);
-        await SeedGamesAsync(church, divisions, ct);
+        await SeedGamesAsync(church, ct);
         await SeedUsersAsync(church, options, ct);
 
         await db.SaveChangesAsync(ct);
@@ -130,43 +130,57 @@ public class DbSeeder(AwanaDbContext db, ILogger<DbSeeder> logger)
         logger.LogInformation("Seeded scoring profile {Name}", SeedCatalog.DefaultProfileName);
     }
 
-    private async Task SeedGamesAsync(
-        Church church, Dictionary<string, Division> divisions, CancellationToken ct)
+    /// <summary>
+    /// The game catalog, which after the first boot belongs to the church.
+    /// </summary>
+    /// <remarks>
+    /// Matched on <see cref="Game.SeedKey"/>, never on name. A church renames
+    /// these, retires them and adds its own, and matching on something visible
+    /// would mean a rename looked to the next boot like a missing game and got
+    /// a duplicate created beside it.
+    ///
+    /// Rows seeded before SeedKey existed are adopted by name once, which is
+    /// the only time a name is consulted. A game sharing its name with a seed
+    /// is that seed, and the alternative is to duplicate it.
+    /// </remarks>
+    private async Task SeedGamesAsync(Church church, CancellationToken ct)
     {
         var existing = await db.Games
             .Where(g => g.ChurchId == church.Id)
-            .Select(g => g.Name)
             .ToListAsync(ct);
 
-        var present = existing.ToHashSet();
+        var byKey = existing
+            .Where(g => g.SeedKey is not null)
+            .ToDictionary(g => g.SeedKey!);
+
+        var unkeyedByName = existing
+            .Where(g => g.SeedKey is null)
+            .ToDictionary(g => g.Name);
 
         foreach (var seed in SeedCatalog.Games)
         {
-            if (present.Contains(seed.Name)) continue;
+            if (byKey.ContainsKey(seed.Key)) continue;
 
-            Guid? divisionId = null;
-
-            if (seed.OnlyDivisionSlug is not null)
+            if (unkeyedByName.TryGetValue(seed.Name, out var adopted))
             {
-                if (!divisions.TryGetValue(seed.OnlyDivisionSlug, out var division))
-                {
-                    logger.LogWarning(
-                        "Game {Game} names division {Division}, which does not exist. Seeding it for all divisions.",
-                        seed.Name, seed.OnlyDivisionSlug);
-                }
-                else
-                {
-                    divisionId = division.Id;
-                }
+                adopted.SeedKey = seed.Key;
+
+                // Filling a blank, which is not the same as overwriting. This
+                // runs once, at the moment a pre-SeedKey row is adopted, so a
+                // note somebody later clears on purpose stays cleared.
+                adopted.Notes ??= seed.Notes;
+
+                logger.LogInformation("Adopted existing game {Game} as seed {Key}", seed.Name, seed.Key);
+                continue;
             }
 
             db.Games.Add(new Game
             {
                 ChurchId = church.Id,
                 Name = seed.Name,
-                DivisionId = divisionId,
-                IsCore = seed.IsCore,
+                Notes = seed.Notes,
                 SortOrder = seed.SortOrder,
+                SeedKey = seed.Key,
             });
 
             logger.LogInformation("Seeded game {Game}", seed.Name);

@@ -17,6 +17,7 @@ public static class ApiEndpoints
         MapAuth(app);
         MapPublic(app);
         MapCatalog(app);
+        MapGames(app);
         MapSessions(app);
         MapRounds(app);
         MapAdjustments(app);
@@ -117,16 +118,95 @@ public static class ApiEndpoints
                 .Select(d => new { d.Id, d.Name, d.Slug })
                 .ToListAsync(ct)));
 
-        group.MapGet("/games", async (AwanaDbContext db, Guid? divisionId, CancellationToken ct) =>
+        // Every division is offered every game. Which ones a division actually
+        // plays on a given night is the games leader's call, not the picker's.
+        group.MapGet("/games", async (AwanaDbContext db, CancellationToken ct) =>
             Results.Ok(await db.Games
                 .AsNoTracking()
                 .Where(g => g.IsActive)
-                // A game restricted to one division is hidden from the others.
-                .Where(g => g.DivisionId == null || divisionId == null || g.DivisionId == divisionId)
-                .OrderByDescending(g => g.IsCore)
-                .ThenBy(g => g.SortOrder)
-                .Select(g => new GameDto(g.Id, g.Name, g.IsCore, g.DivisionId))
+                .OrderBy(g => g.SortOrder)
+                .ThenBy(g => g.Name)
+                .Select(g => new GameDto(g.Id, g.Name))
                 .ToListAsync(ct)));
+    }
+
+    // ---------------------------------------------------------- game catalog
+
+    /// <summary>
+    /// Editing the catalog, as opposed to reading it to record a round.
+    /// </summary>
+    /// <remarks>
+    /// Its own group rather than more verbs on /api/games, because the audience
+    /// is different: the picker wants the active games for one division and
+    /// nothing else, while the catalog wants everything including what has been
+    /// retired. One endpoint serving both would have to be told which it was
+    /// being asked for on every call.
+    ///
+    /// A games leader owns this. It is the role named after the job, and
+    /// somebody who can create and run a session can reasonably say what is
+    /// being played in it. Delete stays with an admin for the same reason
+    /// deleting a session does: it is the one action here that removes a row
+    /// rather than hiding it.
+    /// </remarks>
+    private static void MapGames(WebApplication app)
+    {
+        var group = app.MapGroup("/api/catalog/games")
+            .WithTags("Game catalog")
+            .RequireAuthorization(AuthPolicies.GamesLeader);
+
+        group.MapGet("/", async (ClaimsPrincipal user, GameService games, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Results.Ok(await games.ListAsync(church, ct))
+                : Problems.NoChurch());
+
+        group.MapPost("/", async (
+            SaveGameRequest request, ClaimsPrincipal user, GameService games, CancellationToken ct) =>
+        {
+            if (user.Church() is not { } church) return Problems.NoChurch();
+
+            var result = await games.CreateAsync(church, request, user.Id(), ct);
+            return result.Ok
+                ? Results.Created($"/api/catalog/games/{result.Value!.Id}", result.Value)
+                : Problems.From(result.Error!);
+        });
+
+        group.MapPut("/{id:guid}", async (
+            Guid id, SaveGameRequest request, ClaimsPrincipal user, GameService games, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await games.UpdateAsync(church, id, request, user.Id(), ct))
+                : Problems.NoChurch());
+
+        // Retiring is the ordinary way to get rid of a game, so it is a plain
+        // action rather than a flag buried in the update payload.
+        group.MapPost("/{id:guid}/retire", async (
+            Guid id, ClaimsPrincipal user, GameService games, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await games.SetActiveAsync(church, id, false, user.Id(), ct))
+                : Problems.NoChurch());
+
+        group.MapPost("/{id:guid}/restore", async (
+            Guid id, ClaimsPrincipal user, GameService games, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await games.SetActiveAsync(church, id, true, user.Id(), ct))
+                : Problems.NoChurch());
+
+        group.MapPut("/order", async (
+            ReorderGamesRequest request, ClaimsPrincipal user, GameService games, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await games.ReorderAsync(church, request.Ids, user.Id(), ct))
+                : Problems.NoChurch());
+
+        // Only ever a game that was never played. See DeleteAsync for why
+        // retiring is the answer for every other one.
+        group.MapDelete("/{id:guid}", async (
+            Guid id, ClaimsPrincipal user, GameService games, CancellationToken ct) =>
+        {
+            if (user.Church() is not { } church) return Problems.NoChurch();
+
+            var result = await games.DeleteAsync(church, id, user.Id(), ct);
+            return result.Ok ? Results.NoContent() : Problems.From(result.Error!);
+        })
+            .RequireAuthorization(AuthPolicies.Admin);
     }
 
     // ------------------------------------------------------------- sessions
@@ -267,6 +347,20 @@ internal static class Problems
 
     public static IResult Wrap<T>(ServiceResult<T> result) =>
         result.Ok ? Results.Ok(result.Value) : From(result.Error!);
+
+    /// <summary>
+    /// A signed-in caller whose cookie carries no church.
+    /// </summary>
+    /// <remarks>
+    /// Only reachable with a cookie issued before the claim existed, so the
+    /// answer is 401 rather than 500: signing in again fixes it, and that is
+    /// what a 401 tells the web app to offer.
+    /// </remarks>
+    public static IResult NoChurch() => Results.Problem(
+        detail: "Your sign-in is out of date. Sign in again.",
+        statusCode: 401,
+        title: "Not signed in",
+        extensions: new Dictionary<string, object?> { ["code"] = "no_church" });
 
     private static string TitleFor(int status) => status switch
     {

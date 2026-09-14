@@ -336,19 +336,21 @@ public class RoundService(
 
 
     /// <summary>
-    /// The game exists and this division plays it.
+    /// The game exists, and belongs to this church.
     /// </summary>
     /// <remarks>
     /// Without this a bad id reached the insert and came back as a foreign key
     /// violation, which is a 500: a request that was wrong in an ordinary,
     /// explainable way reported as the server breaking.
+    ///
+    /// It no longer asks whether the division plays it, because every division
+    /// is offered every game. A retired game is still playable here on purpose:
+    /// retiring takes a game out of the picker going forward and must not start
+    /// rejecting a correction to a round that was already recorded on it.
     /// </remarks>
     private async Task<bool> GameIsPlayableAsync(Session session, Guid gameId, CancellationToken ct) =>
         await db.Games.AnyAsync(
-            g => g.Id == gameId
-                && g.ChurchId == session.ChurchId
-                && (g.DivisionId == null || g.DivisionId == session.DivisionId),
-            ct);
+            g => g.Id == gameId && g.ChurchId == session.ChurchId, ct);
 
     private Task<Round?> FindByRequestIdAsync(Guid sessionId, Guid clientRequestId, CancellationToken ct) =>
         db.Rounds

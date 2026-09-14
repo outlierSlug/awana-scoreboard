@@ -4,6 +4,7 @@ using System.Text.Json;
 using Awana.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Awana.Data.Migrations
 {
     [DbContext(typeof(AwanaDbContext))]
-    partial class AwanaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260914052555_GameCatalogNotesAndSeedKey")]
+    partial class GameCatalogNotesAndSeedKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -228,9 +231,17 @@ namespace Awana.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("church_id");
 
+                    b.Property<Guid?>("DivisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("division_id");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<bool>("IsCore")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_core");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -254,6 +265,9 @@ namespace Awana.Data.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_games");
+
+                    b.HasIndex("DivisionId")
+                        .HasDatabaseName("ix_games_division_id");
 
                     b.HasIndex("ChurchId", "Name")
                         .IsUnique()
@@ -754,7 +768,15 @@ namespace Awana.Data.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_games_churches_church_id");
 
+                    b.HasOne("Awana.Data.Entities.Division", "Division")
+                        .WithMany()
+                        .HasForeignKey("DivisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_games_divisions_division_id");
+
                     b.Navigation("Church");
+
+                    b.Navigation("Division");
                 });
 
             modelBuilder.Entity("Awana.Data.Entities.PointAdjustment", b =>

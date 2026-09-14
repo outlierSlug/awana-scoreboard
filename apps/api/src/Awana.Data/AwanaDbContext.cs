@@ -152,8 +152,17 @@ public class AwanaDbContext(DbContextOptions<AwanaDbContext> options) : DbContex
         e.Property(x => x.Name).HasMaxLength(120);
         e.HasIndex(x => new { x.ChurchId, x.Name }).IsUnique();
 
+        e.Property(x => x.Notes).HasMaxLength(2000);
+
+        // Unique so the seeder can match one row per seed. Filtered, because a
+        // church may have any number of games it added itself and those all
+        // carry null.
+        e.Property(x => x.SeedKey).HasMaxLength(60);
+        e.HasIndex(x => new { x.ChurchId, x.SeedKey })
+            .IsUnique()
+            .HasFilter("seed_key IS NOT NULL");
+
         e.HasOne(x => x.Church).WithMany(c => c.Games).HasForeignKey(x => x.ChurchId);
-        e.HasOne(x => x.Division).WithMany().HasForeignKey(x => x.DivisionId);
     });
 
     // ------------------------------------------------------------- sessions

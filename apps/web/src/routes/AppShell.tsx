@@ -34,6 +34,10 @@ export function AppShell() {
 
           <nav className="flex items-center gap-1">
             <ShellLink to="/app/sessions">Sessions</ShellLink>
+            {/* Editing the catalog takes a games leader, and the page says so
+                rather than vanishing: a scorekeeper who cannot find Games at
+                all has no way to learn who to ask. */}
+            <ShellLink to="/app/games">Games</ShellLink>
           </nav>
 
           <div className="ml-auto flex min-w-0 items-center gap-3">

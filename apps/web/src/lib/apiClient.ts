@@ -4,6 +4,8 @@ import type {
   CreateRoundRequest,
   Division,
   Game,
+  GameDetail,
+  SaveGameRequest,
   Preview,
   PreviewRequest,
   RoundRecorded,
@@ -118,8 +120,30 @@ export const api = {
   divisions: (signal?: AbortSignal) =>
     request<Division[]>('GET', '/api/divisions', undefined, signal),
 
-  games: (divisionId?: string, signal?: AbortSignal) =>
-    request<Game[]>('GET', divisionId ? `/api/games?divisionId=${divisionId}` : '/api/games', undefined, signal),
+  // Every division is offered every game, so this takes no division.
+  games: (signal?: AbortSignal) => request<Game[]>('GET', '/api/games', undefined, signal),
+
+  // The game catalog. Separate from the picker above, which reads the same
+  // games but only the active ones and only the fields a round needs.
+  gameCatalog: (signal?: AbortSignal) =>
+    request<GameDetail[]>('GET', '/api/catalog/games', undefined, signal),
+
+  createGame: (body: SaveGameRequest) =>
+    request<GameDetail>('POST', '/api/catalog/games', body),
+
+  updateGame: (id: string, body: SaveGameRequest) =>
+    request<GameDetail>('PUT', `/api/catalog/games/${id}`, body),
+
+  /** Out of the picker, and nothing else. Every round played on it stays. */
+  retireGame: (id: string) => request<GameDetail>('POST', `/api/catalog/games/${id}/retire`),
+
+  restoreGame: (id: string) => request<GameDetail>('POST', `/api/catalog/games/${id}/restore`),
+
+  /** Only ever a game nobody played. The API refuses the rest. */
+  deleteGame: (id: string) => request<void>('DELETE', `/api/catalog/games/${id}`),
+
+  reorderGames: (ids: string[]) =>
+    request<GameDetail[]>('PUT', '/api/catalog/games/order', { ids }),
 
   // Sessions.
   sessions: (signal?: AbortSignal) =>
