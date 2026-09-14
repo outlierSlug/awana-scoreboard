@@ -78,6 +78,7 @@ public class SessionService(
             .Include(s => s.SessionTeams)
             .Include(s => s.Rounds).ThenInclude(r => r.Game)
             .Include(s => s.Rounds).ThenInclude(r => r.Results)
+            .Include(s => s.PointAdjustments)
             .FirstOrDefaultAsync(s => s.Id == id, ct);
 
         if (session is null) return ServiceResult<SessionDetailDto>.Fail(ServiceError.NotFound("Session"));
@@ -126,6 +127,19 @@ public class SessionService(
                             res.BonusPoints,
                             res.Explanation))
                         .ToList()))
+                .ToList(),
+            // Voided ones are kept for the same reason voided rounds are: the
+            // night has to remain explainable afterwards.
+            session.PointAdjustments
+                .OrderBy(a => a.CreatedAt)
+                .Select(a => new AdjustmentDto(
+                    a.Id,
+                    a.TeamId,
+                    byId.TryGetValue(a.TeamId, out var at) ? at.Name : "Unknown",
+                    a.Points,
+                    a.Reason,
+                    a.VoidedAt is not null,
+                    a.CreatedAt))
                 .ToList()));
     }
 
@@ -251,6 +265,169 @@ public class SessionService(
         return await BroadcastStatusAsync(session.Id, ct);
     }
 
+
+    // -------------------------------------------------------- adjustments
+
+    /// <summary>Matches the column, so a long reason is a 400 and not a 500.</summary>
+    private const int MaxReason = 500;
+
+    /// <summary>A ceiling for the same reason the engine has one.</summary>
+    private const decimal MaxAdjustment = 10_000m;
+
+    /// <summary>
+    /// Points a leader decided on, outside the games.
+    /// </summary>
+    /// <remarks>
+    /// Always carries a written reason. An unexplained adjustment is
+    /// indistinguishable from a bug, and the whole value of keeping these apart
+    /// from round results is that a total stays explainable afterwards.
+    /// </remarks>
+    public async Task<ServiceResult<ScoreboardDto>> AddAdjustmentAsync(
+        Guid sessionId, CreateAdjustmentRequest request, Guid? userId, CancellationToken ct = default)
+    {
+        var session = await db.Sessions
+            .Include(s => s.SessionTeams)
+            .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+
+        if (session is null) return ServiceResult<ScoreboardDto>.Fail(ServiceError.NotFound("Session"));
+
+        if (session.Status == SessionStatus.Setup)
+        {
+            return ServiceResult<ScoreboardDto>.Fail(ServiceError.Conflict(
+                "session_not_running", "Start the session before adjusting points."));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Length > MaxReason)
+        {
+            return ServiceResult<ScoreboardDto>.Fail(ServiceError.Invalid(
+                $"Say why in 1 to {MaxReason} characters. The reason is the only record of what this was for."));
+        }
+
+        if (request.Points == 0m || Math.Abs(request.Points) > MaxAdjustment)
+        {
+            return ServiceResult<ScoreboardDto>.Fail(ServiceError.Invalid(
+                $"An adjustment has to be between -{MaxAdjustment} and {MaxAdjustment}, and not zero."));
+        }
+
+        if (session.SessionTeams.All(st => st.TeamId != request.TeamId))
+        {
+            return ServiceResult<ScoreboardDto>.Fail(
+                ServiceError.Invalid("That team is not taking part in this session."));
+        }
+
+        db.PointAdjustments.Add(new PointAdjustment
+        {
+            ChurchId = session.ChurchId,
+            SessionId = session.Id,
+            TeamId = request.TeamId,
+            Points = request.Points,
+            Reason = request.Reason.Trim(),
+            CreatedByUserId = userId,
+        });
+
+        session.Version++;
+        AddAudit(session, userId, "adjustment.added", nameof(PointAdjustment), session.Id, new
+        {
+            request.TeamId,
+            request.Points,
+            Reason = request.Reason.Trim(),
+        });
+
+        await db.SaveChangesAsync(ct);
+
+        return await BroadcastBoardAsync(session.Id, ct);
+    }
+
+    /// <summary>Voided rather than deleted, like a round.</summary>
+    public async Task<ServiceResult<ScoreboardDto>> VoidAdjustmentAsync(
+        Guid adjustmentId, Guid? userId, CancellationToken ct = default)
+    {
+        var adjustment = await db.PointAdjustments
+            .Include(a => a.Session)
+            .FirstOrDefaultAsync(a => a.Id == adjustmentId, ct);
+
+        if (adjustment is null)
+        {
+            return ServiceResult<ScoreboardDto>.Fail(ServiceError.NotFound("Adjustment"));
+        }
+
+        if (adjustment.VoidedAt is not null)
+        {
+            return ServiceResult<ScoreboardDto>.Fail(
+                ServiceError.Conflict("adjustment_voided", "This adjustment is already cleared."));
+        }
+
+        if (adjustment.Session.Status != SessionStatus.Running)
+        {
+            return ServiceResult<ScoreboardDto>.Fail(ServiceError.Conflict(
+                "session_not_running",
+                "This session is not running. Reopen it before changing an adjustment."));
+        }
+
+        adjustment.VoidedAt = DateTimeOffset.UtcNow;
+        adjustment.VoidedByUserId = userId;
+
+        adjustment.Session.Version++;
+        AddAudit(adjustment.Session, userId, "adjustment.voided",
+            nameof(PointAdjustment), adjustment.Id, new { adjustment.TeamId, adjustment.Points });
+
+        await db.SaveChangesAsync(ct);
+
+        return await BroadcastBoardAsync(adjustment.SessionId, ct);
+    }
+
+    // --------------------------------------------------------- attendance
+
+    /// <summary>
+    /// How many turned up, per team. Entirely optional.
+    /// </summary>
+    /// <remarks>
+    /// A number and nothing else. This is a scoreboard, not an attendance
+    /// system: the database never holds a child's name, and a session with no
+    /// headcounts recorded is completely valid.
+    /// </remarks>
+    public async Task<ServiceResult<SessionDetailDto>> UpdateAttendanceAsync(
+        Guid sessionId, UpdateAttendanceRequest request, Guid? userId, CancellationToken ct = default)
+    {
+        var session = await db.Sessions
+            .Include(s => s.SessionTeams)
+            .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+
+        if (session is null) return ServiceResult<SessionDetailDto>.Fail(ServiceError.NotFound("Session"));
+
+        if (request.Teams.Any(t => t.Headcount is < 0 or > 1000))
+        {
+            return ServiceResult<SessionDetailDto>.Fail(
+                ServiceError.Invalid("A headcount has to be between 0 and 1000, or blank."));
+        }
+
+        var byTeam = session.SessionTeams.ToDictionary(st => st.TeamId);
+
+        foreach (var entry in request.Teams)
+        {
+            if (byTeam.TryGetValue(entry.TeamId, out var sessionTeam))
+            {
+                sessionTeam.Headcount = entry.Headcount;
+            }
+        }
+
+        AddAudit(session, userId, "attendance.updated", nameof(Session), session.Id, new
+        {
+            Recorded = request.Teams.Count(t => t.Headcount is not null),
+        });
+
+        await db.SaveChangesAsync(ct);
+
+        return await GetAsync(sessionId, ct);
+    }
+
+    private async Task<ServiceResult<ScoreboardDto>> BroadcastBoardAsync(Guid id, CancellationToken ct)
+    {
+        var board = await scoreboard.BuildAsync(id, ct);
+        if (board is not null) await broadcaster.ScoreboardUpdatedAsync(board, ct);
+        return ServiceResult<ScoreboardDto>.Success(board!);
+    }
+
     private async Task<ServiceResult<ScoreboardDto>> BroadcastStatusAsync(Guid id, CancellationToken ct)
     {
         var board = await scoreboard.BuildAsync(id, ct)!;
@@ -276,6 +453,18 @@ public class SessionService(
 
         return candidate;
     }
+
+    private void AddAudit(
+        Session session, Guid? userId, string action, string entityType, Guid entityId, object data) =>
+        db.AuditLogs.Add(new AuditLog
+        {
+            ChurchId = session.ChurchId,
+            ActorUserId = userId,
+            Action = action,
+            EntityType = entityType,
+            EntityId = entityId,
+            Data = JsonSerializer.SerializeToDocument(data),
+        });
 
     private void AddAudit(Session session, Guid? userId, string action) =>
         db.AuditLogs.Add(new AuditLog

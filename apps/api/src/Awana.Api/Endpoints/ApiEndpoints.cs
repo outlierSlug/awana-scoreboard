@@ -19,6 +19,7 @@ public static class ApiEndpoints
         MapCatalog(app);
         MapSessions(app);
         MapRounds(app);
+        MapAdjustments(app);
     }
 
     // ----------------------------------------------------------------- auth
@@ -164,6 +165,23 @@ public static class ApiEndpoints
             // one session action kept to an admin.
             .RequireAuthorization(AuthPolicies.Admin);
 
+        // Points a leader decided on, outside the games. The scorekeeper is
+        // the one at the console when a leader announces one, and every
+        // adjustment carries their name and a written reason.
+        group.MapPost("/{id:guid}/adjustments",
+            async (Guid id, CreateAdjustmentRequest request, ClaimsPrincipal user,
+                   SessionService sessions, CancellationToken ct) =>
+                Problems.Wrap(await sessions.AddAdjustmentAsync(id, request, user.Id(), ct)))
+            .RequireAuthorization(AuthPolicies.Scorekeeper);
+
+        // A number per team and nothing else. Never a name: this is a
+        // scoreboard, not an attendance system.
+        group.MapPut("/{id:guid}/attendance",
+            async (Guid id, UpdateAttendanceRequest request, ClaimsPrincipal user,
+                   SessionService sessions, CancellationToken ct) =>
+                Problems.Wrap(await sessions.UpdateAttendanceAsync(id, request, user.Id(), ct)))
+            .RequireAuthorization(AuthPolicies.Scorekeeper);
+
         // Writes nothing. Called on every change in the console, so it has to
         // stay cheap.
         group.MapPost("/{id:guid}/scoring/preview",
@@ -203,6 +221,18 @@ public static class ApiEndpoints
         group.MapPost("/{id:guid}/void",
             async (Guid id, VoidRoundRequest request, ClaimsPrincipal user, RoundService rounds, CancellationToken ct) =>
                 Problems.Wrap(await rounds.VoidAsync(id, request.Reason, user.Id(), ct)));
+    }
+
+    // ---------------------------------------------------------- adjustments
+
+    private static void MapAdjustments(WebApplication app)
+    {
+        var group = app.MapGroup("/api/adjustments").WithTags("Adjustments")
+            .RequireAuthorization(AuthPolicies.Scorekeeper);
+
+        group.MapPost("/{id:guid}/void",
+            async (Guid id, ClaimsPrincipal user, SessionService sessions, CancellationToken ct) =>
+                Problems.Wrap(await sessions.VoidAdjustmentAsync(id, user.Id(), ct)));
     }
 }
 

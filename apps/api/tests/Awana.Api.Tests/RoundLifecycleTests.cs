@@ -342,4 +342,93 @@ public class RoundLifecycleTests(ApiFixture fixture)
             $"/api/public/sessions/{session.Slug}/scoreboard"))!;
         Assert.Equal(1, board.RoundCount);
     }
+
+    // ------------------------------------------------------------------ 10
+
+    [Fact]
+    public async Task An_adjustment_moves_the_standings_and_can_be_taken_back()
+    {
+        // The read path already summed these into the standings; there was
+        // simply no way to create one. This is the last of the four
+        // corrections: a leader decides something outside the games.
+        var client = Client;
+        var (divisionId, gameId, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 12, 4));
+        await StartAsync(client, session.Id);
+        await client.PostAsJsonAsync($"/api/sessions/{session.Id}/rounds", CleanRound(gameId, teams));
+
+        // Last place, so the award is visible rather than lost in the noise.
+        var awarded = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/adjustments",
+            new CreateAdjustmentRequest(teams[3], 25m, "Sportsmanship"));
+
+        Assert.Equal(HttpStatusCode.OK, awarded.StatusCode);
+
+        var board = (await awarded.Content.ReadFromJsonAsync<ScoreboardDto>())!;
+        Assert.Equal(35m, board.Standings.Single(s => s.TeamId == teams[3]).Points);
+
+        // It shows up on the session, and clearing it puts the total back.
+        var detail = (await client.GetFromJsonAsync<SessionDetailDto>($"/api/sessions/{session.Id}"))!;
+        var adjustment = Assert.Single(detail.Adjustments);
+        Assert.Equal("Sportsmanship", adjustment.Reason);
+
+        var cleared = await client.PostAsync($"/api/adjustments/{adjustment.Id}/void", null);
+        var after = (await cleared.Content.ReadFromJsonAsync<ScoreboardDto>())!;
+
+        Assert.Equal(10m, after.Standings.Single(s => s.TeamId == teams[3]).Points);
+    }
+
+    // ------------------------------------------------------------------ 11
+
+    [Fact]
+    public async Task An_adjustment_has_to_say_what_it_was_for()
+    {
+        // An unexplained adjustment is indistinguishable from a bug, which is
+        // the whole reason these are kept apart from round results.
+        var client = Client;
+        var (divisionId, _, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 12, 11));
+        await StartAsync(client, session.Id);
+
+        var noReason = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/adjustments", new CreateAdjustmentRequest(teams[0], 10m, "  "));
+        var noPoints = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/adjustments", new CreateAdjustmentRequest(teams[0], 0m, "Nothing"));
+        var strangerTeam = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/adjustments", new CreateAdjustmentRequest(Guid.NewGuid(), 10m, "Who"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, noReason.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, noPoints.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, strangerTeam.StatusCode);
+    }
+
+    // ------------------------------------------------------------------ 12
+
+    [Fact]
+    public async Task Headcounts_are_optional_and_bounded()
+    {
+        var client = Client;
+        var (divisionId, _, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 12, 18));
+        await StartAsync(client, session.Id);
+
+        var saved = await client.PutAsJsonAsync(
+            $"/api/sessions/{session.Id}/attendance",
+            new UpdateAttendanceRequest([new TeamHeadcount(teams[0], 12), new TeamHeadcount(teams[1], null)]));
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        var detail = (await saved.Content.ReadFromJsonAsync<SessionDetailDto>())!;
+        Assert.Equal(12, detail.Teams.Single(t => t.TeamId == teams[0]).Headcount);
+        Assert.Null(detail.Teams.Single(t => t.TeamId == teams[1]).Headcount);
+
+        var absurd = await client.PutAsJsonAsync(
+            $"/api/sessions/{session.Id}/attendance",
+            new UpdateAttendanceRequest([new TeamHeadcount(teams[0], -5)]));
+
+        Assert.Equal(HttpStatusCode.BadRequest, absurd.StatusCode);
+    }
 }

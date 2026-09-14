@@ -138,7 +138,8 @@ public sealed record SessionDetailDto(
     SessionStatus Status,
     int Version,
     IReadOnlyList<SessionTeamDto> Teams,
-    IReadOnlyList<RoundSummaryDto> Rounds);
+    IReadOnlyList<RoundSummaryDto> Rounds,
+    IReadOnlyList<AdjustmentDto> Adjustments);
 
 public sealed record SessionTeamDto(
     Guid TeamId,
@@ -158,6 +159,34 @@ public sealed record RoundSummaryDto(
     IReadOnlyList<RoundTeamDto> Teams);
 
 public sealed record GameDto(Guid Id, string Name, bool IsCore, Guid? DivisionId);
+
+/// <summary>
+/// Points a leader decided on, outside the games.
+///
+/// Separate from a round result on purpose, so that "what happened in the
+/// games" and "what a leader decided" stay distinguishable when somebody asks
+/// how a total was arrived at.
+/// </summary>
+public sealed record AdjustmentDto(
+    Guid Id,
+    Guid TeamId,
+    string TeamName,
+    decimal Points,
+    string Reason,
+    bool IsVoided,
+    DateTimeOffset CreatedAt);
+
+/// <summary>Points may be negative: a penalty is an adjustment too.</summary>
+public sealed record CreateAdjustmentRequest(
+    Guid TeamId,
+    decimal Points,
+    string Reason);
+
+/// <summary>Headcounts, all of them at once. Null clears one.</summary>
+public sealed record UpdateAttendanceRequest(
+    IReadOnlyList<TeamHeadcount> Teams);
+
+public sealed record TeamHeadcount(Guid TeamId, int? Headcount);
 
 /// <summary>
 /// Who the caller is, or that they are nobody.
