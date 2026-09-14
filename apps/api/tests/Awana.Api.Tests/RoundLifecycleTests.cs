@@ -260,4 +260,86 @@ public class RoundLifecycleTests(ApiFixture fixture)
         // And the admin the role exists for can.
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/sessions/{session.Id}/reopen", null)).StatusCode);
     }
+
+    // ------------------------------------------------------------------- 8
+
+    [Fact]
+    public async Task A_round_in_a_finished_session_cannot_be_edited_or_cleared()
+    {
+        // The console hides both once a session is finished, but the console is
+        // not the gate. A stale tab, or anything else holding the round's id,
+        // could rewrite the standings the room was already sent home with.
+        var client = Client;
+        var (divisionId, gameId, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 11, 20));
+        await StartAsync(client, session.Id);
+
+        var created = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/rounds", CleanRound(gameId, teams));
+        var round = (await created.Content.ReadFromJsonAsync<RoundRecordedDto>())!;
+
+        (await client.PostAsync($"/api/sessions/{session.Id}/finish", null)).EnsureSuccessStatusCode();
+
+        var edit = new UpdateRoundRequest(
+            GameId: gameId,
+            Multiplier: 2m,
+            Entries: Enumerable.Reverse(teams).Select((id, i) => new RoundEntryRequest(id, i + 1, false, 0m, null)).ToList());
+
+        var edited = await client.PutAsJsonAsync($"/api/rounds/{round.RoundId}", edit);
+        var cleared = await client.PostAsJsonAsync(
+            $"/api/rounds/{round.RoundId}/void", new VoidRoundRequest("changed my mind"));
+
+        Assert.Equal(HttpStatusCode.Conflict, edited.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, cleared.StatusCode);
+
+        // And the standings are untouched by either attempt.
+        var board = (await client.GetFromJsonAsync<ScoreboardDto>(
+            $"/api/public/sessions/{session.Slug}/scoreboard"))!;
+        Assert.Equal(40m, board.Standings.Single(s => s.TeamId == teams[0]).Points);
+    }
+
+    // ------------------------------------------------------------------- 9
+
+    [Fact]
+    public async Task Bad_input_is_answered_rather_than_crashed_on()
+    {
+        // Each of these used to reach the database and come back as a 500: a
+        // request that was wrong in an ordinary, explainable way, reported as
+        // the server breaking. The scorekeeper sees "something went wrong" and
+        // has nothing to act on.
+        var client = Client;
+        var (divisionId, gameId, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 11, 27));
+        await StartAsync(client, session.Id);
+
+        var entries = teams.Select((id, i) => new RoundEntryRequest(id, i + 1, false, 0m, null)).ToList();
+
+        var unknownGame = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/rounds",
+            new CreateRoundRequest(Guid.NewGuid(), Guid.NewGuid(), 1m, entries));
+
+        Assert.Equal(HttpStatusCode.NotFound, unknownGame.StatusCode);
+
+        var recorded = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/rounds", CleanRound(gameId, teams));
+        var round = (await recorded.Content.ReadFromJsonAsync<RoundRecordedDto>())!;
+
+        var longReason = await client.PostAsJsonAsync(
+            $"/api/rounds/{round.RoundId}/void", new VoidRoundRequest(new string('x', 5000)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, longReason.StatusCode);
+
+        // And an empty one, since the reason is the only record of what happened.
+        var noReason = await client.PostAsJsonAsync(
+            $"/api/rounds/{round.RoundId}/void", new VoidRoundRequest("   "));
+
+        Assert.Equal(HttpStatusCode.BadRequest, noReason.StatusCode);
+
+        // The round survived both attempts.
+        var board = (await client.GetFromJsonAsync<ScoreboardDto>(
+            $"/api/public/sessions/{session.Slug}/scoreboard"))!;
+        Assert.Equal(1, board.RoundCount);
+    }
 }

@@ -50,6 +50,9 @@ public static class ScoringErrorCodes
     public const string TiesNotAllowed = "scoring.ties_not_allowed";
     public const string UnplacedNotAllowed = "scoring.unplaced_not_allowed";
     public const string NegativeMultiplier = "scoring.negative_multiplier";
+    public const string MultiplierTooLarge = "scoring.multiplier_too_large";
+    public const string NegativeBonus = "scoring.negative_bonus";
+    public const string BonusTooLarge = "scoring.bonus_too_large";
     public const string EmptyPointsTable = "scoring.empty_points_table";
     public const string InvalidRounding = "scoring.invalid_rounding";
 }

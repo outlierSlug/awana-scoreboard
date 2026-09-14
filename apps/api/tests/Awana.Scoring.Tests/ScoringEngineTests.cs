@@ -440,6 +440,56 @@ public class ScoringEngineTests
     }
 
     [Fact]
+    public void A_multiplier_far_beyond_any_real_one_is_rejected()
+    {
+        // Points are stored in a fixed-precision column. Without a ceiling a
+        // mistyped multiplier overflows it, and a typo comes back as a server
+        // error rather than as the mistake it is.
+        var entries = new List<TeamEntry> { new(Teams.Red, 1) };
+
+        var validation = Engine.Validate(
+            new RoundInput(entries, Multiplier: ScoringEngine.MaxMultiplier + 1m), ScoringConfig.Default);
+
+        Assert.False(validation.IsValid);
+        Assert.Contains(validation.Errors, e => e.Code == ScoringErrorCodes.MultiplierTooLarge);
+    }
+
+    [Fact]
+    public void A_negative_bonus_is_rejected()
+    {
+        // It was accepted, and silently took points away. A bonus is something
+        // a team earned; subtracting with it turns the bonus box into a penalty
+        // box nobody designed and nobody could later explain.
+        var entries = new List<TeamEntry> { new(Teams.Red, 1, Bonus: -500m) };
+
+        var validation = Engine.Validate(new RoundInput(entries, Multiplier: 1m), ScoringConfig.Default);
+
+        Assert.False(validation.IsValid);
+        Assert.Contains(validation.Errors, e => e.Code == ScoringErrorCodes.NegativeBonus);
+    }
+
+    [Fact]
+    public void A_bonus_far_beyond_any_real_one_is_rejected()
+    {
+        var entries = new List<TeamEntry> { new(Teams.Red, 1, Bonus: ScoringEngine.MaxBonus + 1m) };
+
+        var validation = Engine.Validate(new RoundInput(entries, Multiplier: 1m), ScoringConfig.Default);
+
+        Assert.False(validation.IsValid);
+        Assert.Contains(validation.Errors, e => e.Code == ScoringErrorCodes.BonusTooLarge);
+    }
+
+    [Fact]
+    public void An_ordinary_bonus_is_still_fine()
+    {
+        // The guard rejects the absurd, not the real. Twenty points is what the
+        // bonus bucket has historically been worth.
+        var entries = new List<TeamEntry> { new(Teams.Red, 1, Bonus: 20m) };
+
+        Assert.True(Engine.Validate(new RoundInput(entries, Multiplier: 2m), ScoringConfig.Default).IsValid);
+    }
+
+    [Fact]
     public void Unplaced_team_is_rejected_when_the_profile_forbids_it()
     {
         var config = ScoringConfig.Default with { AllowUnplacedTeams = false };

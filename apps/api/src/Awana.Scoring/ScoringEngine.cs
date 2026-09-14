@@ -11,6 +11,18 @@ namespace Awana.Scoring;
 /// </summary>
 public sealed class ScoringEngine : IScoringEngine
 {
+    /// <summary>
+    /// Ceilings, set where a real value could never reach them.
+    /// </summary>
+    /// <remarks>
+    /// These are not scoring rules so much as a guard on the arithmetic: points
+    /// are stored in a fixed-precision column, and a value with an extra few
+    /// digits on it overflows that column and surfaces as a server error rather
+    /// than as the typo it is.
+    /// </remarks>
+    public const decimal MaxMultiplier = 100m;
+    public const decimal MaxBonus = 10_000m;
+
     public ValidationOutcome Validate(RoundInput input, ScoringConfig config)
     {
         var errors = new List<ValidationError>();
@@ -41,6 +53,34 @@ public sealed class ScoringEngine : IScoringEngine
             errors.Add(new ValidationError(
                 ScoringErrorCodes.NegativeMultiplier,
                 "The round multiplier cannot be negative."));
+        }
+
+        // An upper bound as well as a lower one. A double-worth final is the
+        // reason this exists at all, so anything near this is already a typo,
+        // and without a ceiling the points overflow the column they are stored
+        // in and a mistyped round comes back as a server error.
+        if (input.Multiplier > MaxMultiplier)
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.MultiplierTooLarge,
+                $"The round multiplier cannot be more than {MaxMultiplier}."));
+        }
+
+        // A bonus is something a team earned. Subtracting with it turns the
+        // bonus box into an undocumented penalty box, and a penalty that nobody
+        // designed is exactly the kind of scoring nobody can later explain.
+        if (input.Entries.Any(e => e.Bonus < 0m))
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.NegativeBonus,
+                "A bonus cannot take points away."));
+        }
+
+        if (input.Entries.Any(e => e.Bonus > MaxBonus))
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.BonusTooLarge,
+                $"A bonus cannot be more than {MaxBonus}."));
         }
 
         var duplicates = input.Entries

@@ -21,6 +21,9 @@ public class RoundService(
     IScoreboardBroadcaster broadcaster,
     IScoringEngine engine)
 {
+    /// <summary>Matches the column, so a long reason is a 400 and not a 500.</summary>
+    private const int MaxVoidReason = 500;
+
     // ------------------------------------------------------------- preview
 
     /// <summary>
@@ -102,6 +105,12 @@ public class RoundService(
         {
             return ServiceResult<(RoundRecordedDto, bool)>.Fail(
                 ServiceError.Invalid("A team in this round does not belong to the session's division."));
+        }
+
+        if (!await GameIsPlayableAsync(session, request.GameId, ct))
+        {
+            return ServiceResult<(RoundRecordedDto, bool)>.Fail(
+                ServiceError.NotFound("Game"));
         }
 
         var input = ToRoundInput(request.Entries, request.Multiplier, teams);
@@ -203,6 +212,17 @@ public class RoundService(
                 ServiceError.Conflict("round_voided", "A voided round cannot be edited."));
         }
 
+        // A finished night is a result, not a draft. Changing a round inside
+        // one rewrites the standings the room was shown and then sent home
+        // with, so it takes the deliberate step of reopening the session first,
+        // which is an admin's call and leaves an audit entry of its own.
+        if (round.Session.Status != SessionStatus.Running)
+        {
+            return ServiceResult<RoundRecordedDto>.Fail(ServiceError.Conflict(
+                "session_not_running",
+                $"This session is {round.Session.Status.ToString().ToLowerInvariant()}. Reopen it before changing a round."));
+        }
+
         var session = round.Session;
         var config = await ResolveConfigAsync(session, ct);
         var teams = await TeamsForAsync(session, ct);
@@ -211,6 +231,11 @@ public class RoundService(
         {
             return ServiceResult<RoundRecordedDto>.Fail(
                 ServiceError.Invalid("A team in this round does not belong to the session's division."));
+        }
+
+        if (!await GameIsPlayableAsync(session, request.GameId, ct))
+        {
+            return ServiceResult<RoundRecordedDto>.Fail(ServiceError.NotFound("Game"));
         }
 
         var input = ToRoundInput(request.Entries, request.Multiplier, teams);
@@ -266,10 +291,27 @@ public class RoundService(
 
         if (round is null) return ServiceResult<ScoreboardDto>.Fail(ServiceError.NotFound("Round"));
 
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > MaxVoidReason)
+        {
+            return ServiceResult<ScoreboardDto>.Fail(ServiceError.Invalid(
+                $"Say why in 1 to {MaxVoidReason} characters. The reason is the only record of what happened."));
+        }
+
         if (round.VoidedAt is not null)
         {
             return ServiceResult<ScoreboardDto>.Fail(
                 ServiceError.Conflict("round_voided", "This round is already voided."));
+        }
+
+        // A finished night is a result, not a draft. Changing a round inside
+        // one rewrites the standings the room was shown and then sent home
+        // with, so it takes the deliberate step of reopening the session first,
+        // which is an admin's call and leaves an audit entry of its own.
+        if (round.Session.Status != SessionStatus.Running)
+        {
+            return ServiceResult<ScoreboardDto>.Fail(ServiceError.Conflict(
+                "session_not_running",
+                $"This session is {round.Session.Status.ToString().ToLowerInvariant()}. Reopen it before changing a round."));
         }
 
         // Soft void. The row and its results stay, so the night can still be
@@ -291,6 +333,22 @@ public class RoundService(
     }
 
     // ------------------------------------------------------------- helpers
+
+
+    /// <summary>
+    /// The game exists and this division plays it.
+    /// </summary>
+    /// <remarks>
+    /// Without this a bad id reached the insert and came back as a foreign key
+    /// violation, which is a 500: a request that was wrong in an ordinary,
+    /// explainable way reported as the server breaking.
+    /// </remarks>
+    private async Task<bool> GameIsPlayableAsync(Session session, Guid gameId, CancellationToken ct) =>
+        await db.Games.AnyAsync(
+            g => g.Id == gameId
+                && g.ChurchId == session.ChurchId
+                && (g.DivisionId == null || g.DivisionId == session.DivisionId),
+            ct);
 
     private Task<Round?> FindByRequestIdAsync(Guid sessionId, Guid clientRequestId, CancellationToken ct) =>
         db.Rounds
