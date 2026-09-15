@@ -47,12 +47,12 @@ export function LoginPage({ denied = false }: { denied?: boolean }) {
             )}
 
             <CardTitle className="text-xl">
-              {denied ? 'That account is not on the list' : 'Scorekeeper sign-in'}
+              {denied ? 'That account is not verified' : 'Scorekeeper sign-in'}
             </CardTitle>
 
             <CardDescription className="leading-relaxed">
               {denied
-                ? 'Sign in again to pick a different account, or ask an admin to add this address. Only verified accounts can access the scorekeeper console.'
+                ? 'Sign in with a different account or ask an admin to verify this email address. Only verified accounts can access the scorekeeper console.'
                 : isSignedIn
                   ? 'You are already signed in.'
                   : 'Sign-in with a verified account to access the scorekeeper console.'}
@@ -64,13 +64,13 @@ export function LoginPage({ denied = false }: { denied?: boolean }) {
               // A real navigation, not a fetch: the browser has to go to Google
               // and be handed back.
               <Button asChild size="lg" variant="outline" className="h-11 w-full">
+                {/* One label in both cases. The way out of a refusal is
+                    explained in the text above rather than by renaming the
+                    button, so this stays the one thing on the page that always
+                    means the same thing. */}
                 <a href={api.loginUrl(returnUrl)}>
                   <GoogleMark />
-                  {/* Named for what it is for here. "Continue with Google" on
-                      the page that just refused a Google account reads as the
-                      same door that was locked a second ago, which is why
-                      somebody turned away presses it and expects nothing. */}
-                  {denied ? 'Try a different account' : 'Continue with Google'}
+                  Continue with Google
                 </a>
               </Button>
             )}
