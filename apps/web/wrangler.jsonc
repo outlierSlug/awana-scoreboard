@@ -1,0 +1,35 @@
+// Cloudflare Workers Static Assets: how the built web app is served.
+//
+// There is deliberately no "main" here. A Worker that only serves files does
+// not need a script, and adding an empty one would put a runtime in front of
+// every request for a stylesheet for no reason.
+//
+// Cloudflare now steers new projects to Workers rather than Pages. That suits
+// this app: "single-page-application" below is native SPA routing, which is
+// the thing Pages could only do through a _redirects rule its build system
+// sometimes flagged as a loop and silently ignored.
+{
+  "name": "awana-scoreboard",
+
+  // Pins the Workers runtime behaviour to what existed on this date, so a
+  // later platform change cannot alter how the board is served without
+  // somebody deliberately moving this forward.
+  "compatibility_date": "2026-09-14",
+
+  "assets": {
+    // Relative to this file. The Cloudflare project's root directory is
+    // apps/web, and Vite's default output is apps/web/dist.
+    "directory": "./dist",
+
+    // React Router owns the routes, so a cold load of
+    // /board/tnt-2026-10-02, or a refresh on it, must be answered with
+    // index.html and a 200 rather than a 404. "single-page-application" does
+    // exactly that, and it is served as a 200 rather than a redirect, so the
+    // router still sees the real path.
+    //
+    // public/_redirects carries the same rule for portability. It is harmless
+    // and identical in effect, but THIS is the setting that is actually doing
+    // the work now.
+    "not_found_handling": "single-page-application"
+  }
+}

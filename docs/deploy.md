@@ -138,14 +138,21 @@ Cloudflare and Render will each terminate TLS and disagree about it.
 The apex is created for you in the next step. Add a redirect rule sending
 `www.awanascoreboard.org/*` to `https://awanascoreboard.org/$1`.
 
-### Pages
+### Workers
 
-Create a Pages project from the repo:
+Cloudflare steers new projects to **Workers**, not Pages. Take it. `apps/web/wrangler.jsonc`
+is written for it, and its `not_found_handling: "single-page-application"` is native SPA
+routing, which is more dependable than the `_redirects` rule Pages relied on.
+
+Create a Worker from the repo:
 
 - **Root directory** `apps/web`
 - **Build command** `npm ci && npm run build`
-- **Output directory** `dist`
+- **Deploy command** `npx wrangler deploy`
 - **Node version** 22
+
+There is no output-directory field. `wrangler.jsonc` names `./dist` instead, and the
+Worker has no `main`: it serves files and runs no code.
 
 One environment variable, and the build fails without it by design:
 
@@ -157,19 +164,12 @@ Vite inlines this at **build** time, so changing it needs a rebuild, not a resta
 `src/config.ts` throws at module load if it is missing rather than letting the app fetch
 the string `undefined` at runtime.
 
-Then add `awanascoreboard.org` as a custom domain on the Pages project. Cloudflare
-writes the apex DNS record itself.
+Then add `awanascoreboard.org` as a custom domain on the Worker. Cloudflare writes the
+apex DNS record itself.
 
-Two things to know about Pages here:
-
-- `public/_redirects` carries the SPA fallback that makes a cold load of
-  `/board/tnt-2026-10-02` serve `index.html`. Cloudflare's build system sometimes flags
-  the rule as an infinite loop and ignores it silently. **If deep links 404 after a
-  deploy, that is the cause**, and the fallback is a Workers Static Assets deploy with
-  `"not_found_handling": "single-page-application"`.
-- Preview deployments get `*.pages.dev` URLs, which are cross-site to the API, so
-  **auth does not work on previews**. Previews still exercise the public board, which is
-  most of what they are useful for.
+One thing to know: preview and branch deployments get `*.workers.dev` URLs, which are
+cross-site to the API, so **auth does not work on previews**. They still exercise the
+public board, which is most of what they are useful for.
 
 ## 5. Smoke test
 
