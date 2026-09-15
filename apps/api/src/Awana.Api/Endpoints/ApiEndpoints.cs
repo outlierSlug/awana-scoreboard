@@ -65,12 +65,13 @@ public static class ApiEndpoints
         // answer rather than a 401.
         group.MapGet("/me", (ClaimsPrincipal user) =>
         {
-            if (user.Id() is not { } id) return Results.Ok(new MeDto(false, null, null, null));
+            if (user.Id() is not { } id) return Results.Ok(new MeDto(false, null, null, null, null));
 
             return Results.Ok(new MeDto(
                 true,
                 id,
                 user.FindFirstValue(System.Security.Claims.ClaimTypes.Name),
+                user.FindFirstValue(System.Security.Claims.ClaimTypes.Email),
                 user.RoleOf()?.ToString()));
         });
     }

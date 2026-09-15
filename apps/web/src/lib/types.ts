@@ -169,6 +169,8 @@ export interface Me {
   isSignedIn: boolean
   userId: string | null
   displayName: string | null
+  /** Which account, as opposed to which person. Two people share a first name. */
+  email: string | null
   role: string | null
 }
 

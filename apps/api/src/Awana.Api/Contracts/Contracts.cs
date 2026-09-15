@@ -333,4 +333,10 @@ public sealed record MeDto(
     bool IsSignedIn,
     Guid? UserId,
     string? DisplayName,
+    /// <summary>
+    /// Which account, as opposed to which person. Two volunteers can share a
+    /// first name, and a shared laptop is the normal case, so the address is
+    /// what actually answers "am I signed in as me".
+    /// </summary>
+    string? Email,
     string? Role);

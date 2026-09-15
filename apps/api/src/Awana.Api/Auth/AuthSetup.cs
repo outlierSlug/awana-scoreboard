@@ -143,6 +143,15 @@ public static class AuthSetup
         // identity once we have seen it. The seeded row only had an address.
         user.GoogleSubject ??= subject;
         user.LastLoginAt = DateTimeOffset.UtcNow;
+
+        // The seeder can only put the address in this column, because an
+        // address is all an allowlist has. This is the moment the real name
+        // becomes available, and taking it every time rather than once means a
+        // volunteer who changes their name in their Google account is not
+        // stuck with the old one here.
+        var googleName = context.Principal?.FindFirstValue(ClaimTypes.Name)?.Trim();
+        if (!string.IsNullOrWhiteSpace(googleName)) user.DisplayName = googleName;
+
         await db.SaveChangesAsync(context.HttpContext.RequestAborted);
 
         // Replace Google's ticket with our own claims, so nothing downstream
