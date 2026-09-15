@@ -62,6 +62,20 @@ export function HubProvider({ children }: { children: ReactNode }) {
 
       write(queryKeys.scoreboard(dto.slug))
       write(queryKeys.scoreboard(dto.sessionId))
+
+      // The console watches the same session through a different shape: rounds,
+      // teams and adjustments, none of which are in a scoreboard. So the push
+      // cannot be written into its cache, only used as the news that there is
+      // something to go and fetch.
+      //
+      // This is what lets two scorekeepers work the same night. Before it, a
+      // console only ever learned about its own edits, and a round recorded on
+      // the other phone was invisible until somebody reloaded.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.session(dto.sessionId) })
+
+      // Status is the part of a session summary that moves, so the list wants
+      // the same nudge. Only refetches where it is actually on screen.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sessions() })
     },
     [queryClient],
   )

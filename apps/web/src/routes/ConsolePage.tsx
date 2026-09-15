@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ExternalLink, Flag, Info, Play, RotateCcw, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FinalStandings } from '@/components/round/FinalStandings'
@@ -15,6 +15,7 @@ import { Modal } from '@/components/ui/Modal'
 import { useMe } from '@/lib/auth'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
+import { useHub } from '@/lib/signalr/hubContext'
 import type { ScoringProfile } from '@/lib/types'
 import {
   SessionStatus,
@@ -57,6 +58,22 @@ export function ConsolePage() {
     queryFn: ({ signal }) => api.session(id!, signal),
     enabled: Boolean(id),
   })
+
+  // The console listens to the same session the board does.
+  //
+  // Not for the scoreboard itself, which this page reads from its own query,
+  // but for the news that something changed. Two leaders on two phones is the
+  // normal case, and without this each one only ever saw its own edits.
+  //
+  // Joining by id rather than slug on purpose: the hub accepts either, and the
+  // id is what this route already has before the session has loaded.
+  const { join, leave } = useHub()
+
+  useEffect(() => {
+    if (!id) return
+    join(id)
+    return () => leave(id)
+  }, [id, join, leave])
 
   // Once the night is over the scorekeeper wants the result, not a list of who
   // played. Read from the same endpoint the wall reads, so the totals here and

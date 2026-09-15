@@ -24,6 +24,12 @@ export function HomePage() {
     queryFn: ({ signal }) => api.liveSessions(church, signal),
     // Somebody may leave this open waiting for the night to start.
     refetchInterval: 15_000,
+
+    // And "leave this open" usually means on a second screen, or a tab that is
+    // not the one being looked at. Polling stops in an unfocused window by
+    // default, which turns the wait for the night to start into a page that
+    // quietly froze at "nothing is live right now".
+    refetchIntervalInBackground: true,
   })
 
   // Last week's result is the other thing anyone comes here for, and a session

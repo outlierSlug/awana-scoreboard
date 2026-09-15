@@ -44,6 +44,12 @@ export function SessionsPage() {
   const sessions = useQuery<SessionSummary[]>({
     queryKey: queryKeys.sessions(),
     queryFn: ({ signal }) => api.sessions(signal),
+
+    // Two leaders on two phones is the normal case, so this list is rarely the
+    // only thing deciding what exists. Without a poll it only ever showed the
+    // results of its own actions, and a session somebody else started stayed
+    // invisible until a manual reload.
+    refetchInterval: 15_000,
   })
 
   const divisions = useQuery<Division[]>({

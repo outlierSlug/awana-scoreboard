@@ -48,7 +48,20 @@ export const queryClient = new QueryClient({
       // the normal path. What matters far more is recovering the moment the
       // network comes back, which is the common failure in a gym.
       refetchOnReconnect: true,
-      refetchOnWindowFocus: false,
+
+      // On, and it is the single thing that stops "why is this screen wrong".
+      //
+      // Only the board subscribes to the hub. Every other screen is a plain
+      // query, so a list left open in another window showed whatever was true
+      // when it was last looked at. Worse, refetchInterval is itself gated on
+      // focus (refetchIntervalInBackground defaults to false), so an unfocused
+      // window stops polling AND had nothing to catch it up on the way back.
+      //
+      // Nothing here is expensive enough to care, and no screen holds unsaved
+      // work in a query: the round being tapped out lives in component state,
+      // so a refetch cannot take it away.
+      refetchOnWindowFocus: true,
+
       staleTime: 30_000,
 
       retry: (failureCount, error) => {
