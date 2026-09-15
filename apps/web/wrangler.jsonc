@@ -27,9 +27,11 @@
     // exactly that, and it is served as a 200 rather than a redirect, so the
     // router still sees the real path.
     //
-    // public/_redirects carries the same rule for portability. It is harmless
-    // and identical in effect, but THIS is the setting that is actually doing
-    // the work now.
+    // This is the ONLY place that rule lives. public/_redirects used to carry
+    // a "/* /index.html 200" copy of it, and Workers rejects that outright:
+    // "Infinite loop detected in this rule", because the catch-all can match
+    // the very path it rewrites to. Do not add it back; the two are not
+    // complementary, and the deploy fails rather than preferring one.
     "not_found_handling": "single-page-application"
   }
 }

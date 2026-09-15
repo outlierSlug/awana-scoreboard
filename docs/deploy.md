@@ -154,6 +154,11 @@ Create a Worker from the repo:
 There is no output-directory field. `wrangler.jsonc` names `./dist` instead, and the
 Worker has no `main`: it serves files and runs no code.
 
+**Never add a `/* /index.html 200` rule to `public/_redirects`.** It is the same rule
+`not_found_handling` already applies, and Workers refuses it outright rather than
+picking one: the deploy fails with *"Infinite loop detected in this rule"*, because the
+catch-all can match the path it rewrites to. `_headers` is unaffected and still applies.
+
 One environment variable, and the build fails without it by design:
 
 ```
