@@ -41,12 +41,23 @@ services:
 
       # Neon DIRECT connection string, used only for migrations. DDL must not
       # run through the pooler.
-      - key: ConnectionStrings__Migrations
+      #
+      # The key is Database__MigrationsConnectionString, not
+      # ConnectionStrings__Migrations. DatabaseInitializer reads this off
+      # DatabaseOptions, whose section is "Database", so the ConnectionStrings
+      # spelling binds to nothing: migrations would fall back to the pooled
+      # connection and hit exactly the PgBouncer failure this exists to avoid.
+      # (ConnectionStrings__Migrations IS the right name for the design-time
+      # factory that `dotnet ef` uses, which is why the two look alike. That
+      # path never runs on Render.)
+      - key: Database__MigrationsConnectionString
         sync: false
 
       # Lets migrations be turned off from the dashboard without a redeploy
-      # when something goes wrong at a bad moment.
-      - key: RunMigrationsOnStartup
+      # when something goes wrong at a bad moment. Same section prefix, for the
+      # same reason: without it this reads as false-but-ignored, and the switch
+      # would appear to work while migrations kept running.
+      - key: Database__RunMigrationsOnStartup
         value: "true"
 
       # Allowed browser origins. The double underscore is how .NET configuration
@@ -68,4 +79,16 @@ services:
       - key: Seed__GamesLeaderEmails
         sync: false
       - key: Seed__ScorekeeperEmails
+        sync: false
+
+      # Seed__ChurchSlug is deliberately NOT set.
+      #
+      # It defaults to "church", and the public home page asks for that exact
+      # slug, hardcoded, because v1 ships configured for one church. Setting it
+      # to something truer like "eccs" would leave the API answering correctly
+      # and the home page listing nothing, with no error anywhere. Change both
+      # or neither.
+      #
+      # Seed__ChurchName is safe to set: it is a display name, not a URL.
+      - key: Seed__ChurchName
         sync: false
