@@ -69,32 +69,48 @@ jobs:
           echo "Dump looks complete: $(wc -c < backup.sql) bytes."
 
       - name: Encrypt
-        env:
-          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
           set -euo pipefail
 
-          if [ -z "${BACKUP_PASSPHRASE}" ]; then
-            echo "BACKUP_PASSPHRASE is not set. Refusing to store an unencrypted dump."
+          # THIS REPOSITORY IS PUBLIC, and so are its artifacts: anyone with a
+          # GitHub account can download them and then attack the file offline,
+          # forever, with no rate limit and no way for us to notice.
+          #
+          # Which is why this is asymmetric. A passphrase would be the only
+          # thing standing between that attacker and the data, and its strength
+          # would be unauditable from here. The public key below can encrypt and
+          # nothing else; decrypting needs a private key that has never been
+          # near GitHub. There is no shared secret to guess.
+          if grep -q 'REPLACE_ME_WITH_YOUR_AGE_PUBLIC_KEY' .github/backup-recipient.txt; then
+            echo "No recipient key set. See docs/backups.md."
+            echo "Refusing to store a dump that nothing can decrypt, or worse, one in the clear."
             exit 1
           fi
 
-          # THIS REPOSITORY IS PUBLIC, and so are its artifacts: anyone can
-          # download them. The dump carries volunteer names and email addresses,
-          # so it does not leave this job in the clear.
-          gpg --batch --yes --symmetric \
-              --cipher-algo AES256 \
-              --passphrase "$BACKUP_PASSPHRASE" \
-              --output backup.sql.gpg \
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+
+          age --encrypt \
+              --recipients-file .github/backup-recipient.txt \
+              --output backup.sql.age \
               backup.sql
 
           rm backup.sql
+
+          # Cheap proof that what is about to be stored is a real age file and
+          # not an empty or truncated one. Its header is plain text, so this
+          # needs no key and cannot break on a changed error message.
+          test -s backup.sql.age
+          head -c 21 backup.sql.age | grep -q 'age-encryption.org/v1' \
+            || { echo "Output is not an age file."; exit 1; }
+
+          echo "Encrypted: $(wc -c < backup.sql.age) bytes."
 
       - name: Store
         uses: actions/upload-artifact@v4
         with:
           name: awana-backup-${{ github.run_id }}
-          path: backup.sql.gpg
+          path: backup.sql.age
           # Long enough to cover a whole Awana season, which is the unit anyone
           # would actually want back.
           retention-days: 90

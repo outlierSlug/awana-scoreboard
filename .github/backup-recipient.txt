@@ -1,0 +1,19 @@
+# The age PUBLIC key that database backups are encrypted to.
+#
+# A public key is meant to be public. It can only encrypt, so it is committed
+# here on purpose: versioned, visible, and one less secret living in GitHub.
+#
+# The matching PRIVATE key is the only thing that can decrypt a backup. It must
+# never appear in this repository, in GitHub Actions, or in any log. It lives in
+# a password manager, and a copy somewhere that is not the same laptop.
+#
+# To create the pair, once:
+#
+#     age-keygen -o awana-backup-key.txt
+#
+# That prints "Public key: age1...". Replace the placeholder line below with it,
+# then put awana-backup-key.txt somewhere safe and delete it from Downloads.
+#
+# Lines starting with # are ignored by age.
+
+REPLACE_ME_WITH_YOUR_AGE_PUBLIC_KEY
