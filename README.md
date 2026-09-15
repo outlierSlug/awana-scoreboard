@@ -10,23 +10,45 @@ configured for a single church.
 
 ## Status
 
-Pre-alpha, scaffolding in progress. Target launch is Friday, 2026-10-02.
+Live at **<https://awanascoreboard.org>**, ahead of first use on Friday, 2026-10-02.
 
-Nothing here is usable yet. The design is settled. Architecture notes and the scoring
-rules will be documented here as they get built.
+A whole night runs end to end: create a session and start it, record rounds including
+ties, disqualifications and score multipliers, correct or clear a round after the fact,
+adjust points with a written reason, finish, and reopen. The public scoreboard follows
+along over SignalR without anyone reloading it, and holds the last known scores on screen
+rather than blanking if the connection drops.
 
-## Planned stack
+Still to do before the first real night: a rehearsal on the gym's own TV and wifi, and a
+printed card for whoever runs the console when the author is away.
+
+## Stack
 
 | Layer | Choice |
 |---|---|
-| Frontend | Vite + React 19 + TypeScript, Tailwind CSS v4, shadcn/ui, deployed to Cloudflare Pages |
-| Backend | ASP.NET Core (.NET 10 LTS) + EF Core, deployed to Render |
+| Frontend | Vite + React 19 + TypeScript, Tailwind CSS v4, shadcn/ui, deployed to Cloudflare Workers |
+| Backend | ASP.NET Core (.NET 10) + EF Core, deployed to Render |
 | Database | Neon Postgres in production, Postgres via Docker Compose locally |
 | Real-time | SignalR, broadcast only. All writes go through REST. |
-| Auth | Google OAuth with an HttpOnly same-site cookie and a seeded admin allowlist |
+| Auth | Google OAuth with an HttpOnly same-site cookie and a seeded email allowlist |
 
 The public scoreboard is a public URL with no login. The scorekeeper and admin views
 require sign-in.
+
+Both hosts sit under one registrable domain (`awanascoreboard.org` and
+`api.awanascoreboard.org`) so the session cookie stays same-site. On `*.workers.dev` and
+`*.onrender.com` it would not, since both are on the Public Suffix List, and the cookie
+would need `SameSite=None` — which Safari blocks outright.
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [docs/session-flow.md](docs/session-flow.md) | What a session is and how a night is run |
+| [docs/scoring-rules.md](docs/scoring-rules.md) | Placement points, ties, disqualifications, multipliers |
+| [docs/game-catalog.md](docs/game-catalog.md) | The games list and how it is edited |
+| [docs/deploy.md](docs/deploy.md) | Neon, Render and Cloudflare, in the order they have to be done |
+| [docs/backups.md](docs/backups.md) | Weekly encrypted dumps, and how to restore one |
+| [docs/dry-run.md](docs/dry-run.md) | Rehearsing a night, including breaking the network on purpose |
 
 ## Privacy
 
@@ -77,10 +99,21 @@ dev server does not start without it. For personal overrides create
 ### Tests
 
 ```sh
-dotnet test apps/api/Awana.slnx
+dotnet test apps/api/Awana.slnx      # scoring engine + API against a real Postgres
+npm test --prefix apps/web           # round entry reducer
 npm run lint --prefix apps/web
-npm run build --prefix apps/web
+npm run build --prefix apps/web      # runs tsc -b, which is the real type check
 ```
+
+The API integration tests start their own Postgres through Testcontainers, so Docker has
+to be running, and they do not touch the development database.
+
+Kill the API before `dotnet test`. A running `Awana.Api.exe` holds a lock on the DLLs it
+is about to rebuild, and the failure names MSB3027 rather than the cause.
+
+Type checking must go through `tsc -b`, not `tsc --noEmit`. The web app's `tsconfig.json`
+is solution style, with `"files": []` and project references, so `--noEmit` compiles
+nothing at all and exits zero however broken the code is.
 
 ## License
 
