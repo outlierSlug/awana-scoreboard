@@ -48,6 +48,16 @@
      covers only what shadcn has no concept of: teams, the board, and
      connection state. */
 
+  /* A control the screen is waiting on, used on the console's game picker.
+     Everything below that control is inert until it has an answer, and a
+     dropdown styled like every other control gives no clue that it is the one
+     holding the screen up.
+
+     Indigo on purpose: every warmer accent collides with a team colour on a
+     screen covered in red, blue, yellow and green team buttons, and this must
+     not read as a team or as an error. */
+  --color-needs-input: #6366f1;
+
   /* Connection status, shown on the board so that silent staleness is
      impossible. Green connected, amber reconnecting, red offline. */
   --color-status-live: #22c55e;

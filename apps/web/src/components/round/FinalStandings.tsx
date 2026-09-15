@@ -1,4 +1,5 @@
 import type { Standing } from '@/lib/types'
+import { formatPoints } from '@/lib/format'
 
 /**
  * Where the night ended.
@@ -38,7 +39,7 @@ export function FinalStandings({ standings }: { standings: Standing[] }) {
           </span>
 
           <span className="ml-auto text-lg font-bold tabular-nums sm:ml-0">
-            {Math.round(team.points)}
+            {formatPoints(team.points)}
           </span>
         </li>
       ))}

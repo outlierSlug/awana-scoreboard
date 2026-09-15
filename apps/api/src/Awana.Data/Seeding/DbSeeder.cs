@@ -111,12 +111,29 @@ public class DbSeeder(AwanaDbContext db, ILogger<DbSeeder> logger)
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// The official table, which the church cannot edit. See ScoringProfile.
+    /// </summary>
     private async Task SeedScoringProfileAsync(Church church, CancellationToken ct)
     {
-        var exists = await db.ScoringProfiles
-            .AnyAsync(p => p.ChurchId == church.Id && p.Name == SeedCatalog.DefaultProfileName, ct);
+        var keyed = await db.ScoringProfiles
+            .AnyAsync(p => p.ChurchId == church.Id && p.SeedKey == SeedCatalog.DefaultProfileKey, ct);
 
-        if (exists) return;
+        if (keyed) return;
+
+        // Adopted by name once, for a row seeded before the key existed. The
+        // only time a name is consulted.
+        var unkeyed = await db.ScoringProfiles.FirstOrDefaultAsync(
+            p => p.ChurchId == church.Id && p.SeedKey == null && p.Name == SeedCatalog.DefaultProfileName,
+            ct);
+
+        if (unkeyed is not null)
+        {
+            unkeyed.SeedKey = SeedCatalog.DefaultProfileKey;
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Adopted scoring profile {Name} as the seeded one", unkeyed.Name);
+            return;
+        }
 
         db.ScoringProfiles.Add(new ScoringProfile
         {
@@ -124,6 +141,7 @@ public class DbSeeder(AwanaDbContext db, ILogger<DbSeeder> logger)
             Name = SeedCatalog.DefaultProfileName,
             Config = ScoringConfig.Default,
             IsDefault = true,
+            SeedKey = SeedCatalog.DefaultProfileKey,
         });
 
         await db.SaveChangesAsync(ct);

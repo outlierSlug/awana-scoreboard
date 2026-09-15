@@ -4,6 +4,7 @@ import { BoardPage } from '@/routes/BoardPage'
 import { ConsolePage } from '@/routes/ConsolePage'
 import { GamesPage } from '@/routes/GamesPage'
 import { HomePage } from '@/routes/HomePage'
+import { ScoringPage } from '@/routes/ScoringPage'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage } from '@/routes/NotFoundPage'
 import { RequireSignIn } from '@/components/RequireSignIn'
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="sessions" element={<SessionsPage />} />
         <Route path="sessions/:id" element={<ConsolePage />} />
         <Route path="games" element={<GamesPage />} />
+        <Route path="scoring" element={<ScoringPage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

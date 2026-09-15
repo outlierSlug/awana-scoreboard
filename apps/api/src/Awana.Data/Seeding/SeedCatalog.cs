@@ -88,7 +88,11 @@ internal static class SeedCatalog
         // is where they should write it down.
         new("beanbag-curling", "Beanbag Curling", 10,
             "Slid rather than raced: finishing order comes from a curling style distance score rather than who crossed first."),
-        new("prize-pool", "Prize Pool", 11),
+        new("prize-pool", "Prize Pool", 11,
+            "A hula hoop of assorted items sits in the center circle. Everyone on each team goes once "
+            + "around the circle, then into the middle to grab one item. When the hoop is empty or time "
+            + "is up, price the items up and total each team's haul: the totals decide the finishing "
+            + "order. A longer game than most, so a round of it is often worth a multiplier."),
         new("number-calling", "Number Calling", 12),
         new("color-cube", "Color Cube", 13),
 
@@ -96,4 +100,7 @@ internal static class SeedCatalog
     ];
 
     internal const string DefaultProfileName = "Official AWANA";
+
+    /// <summary>Stable and invisible. A set carrying it is read only.</summary>
+    internal const string DefaultProfileKey = "official-awana";
 }

@@ -184,6 +184,68 @@
  * side of the gym, and the laptop half needs the pointer to tell what can be
  * clicked and the not-allowed cursor to explain why a button is doing nothing.
  */
+/*
+ * Dialogs arrive rather than appear.
+ *
+ * Entrance only. Animating the exit as well would mean keeping the contents
+ * mounted through the fade, and they are deliberately unmounted on close so a
+ * form starts fresh the next time it is opened. The close is not what anybody
+ * notices anyway: the jarring half is a box materializing under the cursor.
+ *
+ * Written against the element rather than a class because every dialog in the
+ * app is the one Modal component, and @starting-style is what makes a
+ * transition run on something arriving in the top layer. A browser without it
+ * simply shows the dialog, which is exactly today's behavior.
+ */
+@layer base {
+  dialog {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+    transition:
+      opacity 140ms ease-out,
+      transform 140ms ease-out;
+  }
+
+  dialog[open] {
+    opacity: 1;
+    transform: none;
+  }
+
+  @starting-style {
+    dialog[open] {
+      opacity: 0;
+      transform: translateY(0.5rem) scale(0.98);
+    }
+  }
+
+  dialog::backdrop {
+    opacity: 0;
+    transition: opacity 140ms ease-out;
+  }
+
+  dialog[open]::backdrop {
+    opacity: 1;
+  }
+
+  @starting-style {
+    dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  /* Somebody who has asked for less movement gets the dialog, not the slide. */
+  @media (prefers-reduced-motion: reduce) {
+    dialog,
+    dialog::backdrop {
+      transition: none;
+    }
+
+    dialog {
+      transform: none;
+    }
+  }
+}
+
 @layer base {
   a[href],
   button:not(:disabled),

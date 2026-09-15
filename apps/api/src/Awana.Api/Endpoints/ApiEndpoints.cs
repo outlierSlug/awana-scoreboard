@@ -3,6 +3,7 @@ using Awana.Api.Auth;
 using Awana.Api.Contracts;
 using Awana.Api.Services;
 using Awana.Data;
+using Awana.Scoring;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
@@ -18,6 +19,7 @@ public static class ApiEndpoints
         MapPublic(app);
         MapCatalog(app);
         MapGames(app);
+        MapScoringProfiles(app);
         MapSessions(app);
         MapRounds(app);
         MapAdjustments(app);
@@ -209,6 +211,102 @@ public static class ApiEndpoints
             .RequireAuthorization(AuthPolicies.Admin);
     }
 
+    // --------------------------------------------------------- scoring rules
+
+    /// <summary>
+    /// The named sets of scoring rules, and the editor behind them.
+    /// </summary>
+    /// <remarks>
+    /// Reading is open to a games leader, because choosing which rules a
+    /// session runs under happens on the new session form. Writing is an
+    /// admin's, because these decide what every future night is worth and one
+    /// wrong digit here is worth more than any single mistyped round.
+    ///
+    /// Editing is safe for history regardless: a session freezes its own copy
+    /// of the rules when it starts, so nothing here can reach a night already
+    /// played. See ScoringProfileService.
+    /// </remarks>
+    private static void MapScoringProfiles(WebApplication app)
+    {
+        var group = app.MapGroup("/api/catalog/scoring-profiles")
+            .WithTags("Scoring rules")
+            .RequireAuthorization(AuthPolicies.GamesLeader);
+
+        group.MapGet("/", async (ClaimsPrincipal user, ScoringProfileService profiles, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Results.Ok(await profiles.ListAsync(church, ct))
+                : Problems.NoChurch());
+
+        // Nothing is written and no profile need exist, so the editor can show
+        // what an unsaved edit would do before anyone commits to it. A games
+        // leader can reach it for the same reason they can read the list.
+        group.MapPost("/preview", (ScoringConfig config, ScoringProfileService profiles) =>
+            Problems.Wrap(profiles.Preview(config)));
+
+        var admin = group.MapGroup("/").RequireAuthorization(AuthPolicies.Admin);
+
+        admin.MapPost("/", async (
+            SaveScoringProfileRequest request, ClaimsPrincipal user,
+            ScoringProfileService profiles, CancellationToken ct) =>
+        {
+            if (user.Church() is not { } church) return Problems.NoChurch();
+
+            var result = await profiles.CreateAsync(church, request, user.Id(), ct);
+            return result.Ok
+                ? Results.Created($"/api/catalog/scoring-profiles/{result.Value!.Id}", result.Value)
+                : Problems.From(result.Error!);
+        });
+
+        // How anything gets changed about the standard table, which is read
+        // only: copy it, then edit the copy.
+        admin.MapPost("/{id:guid}/duplicate", async (
+            Guid id, ClaimsPrincipal user, ScoringProfileService profiles, CancellationToken ct) =>
+        {
+            if (user.Church() is not { } church) return Problems.NoChurch();
+
+            var result = await profiles.DuplicateAsync(church, id, user.Id(), ct);
+            return result.Ok
+                ? Results.Created($"/api/catalog/scoring-profiles/{result.Value!.Id}", result.Value)
+                : Problems.From(result.Error!);
+        });
+
+        admin.MapPut("/{id:guid}", async (
+            Guid id, SaveScoringProfileRequest request, ClaimsPrincipal user,
+            ScoringProfileService profiles, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await profiles.UpdateAsync(church, id, request, user.Id(), ct))
+                : Problems.NoChurch());
+
+        // What a new session gets when nobody chooses.
+        admin.MapPost("/{id:guid}/default", async (
+            Guid id, ClaimsPrincipal user, ScoringProfileService profiles, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await profiles.SetDefaultAsync(church, id, user.Id(), ct))
+                : Problems.NoChurch());
+
+        admin.MapPost("/{id:guid}/retire", async (
+            Guid id, ClaimsPrincipal user, ScoringProfileService profiles, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await profiles.SetActiveAsync(church, id, false, user.Id(), ct))
+                : Problems.NoChurch());
+
+        admin.MapPost("/{id:guid}/restore", async (
+            Guid id, ClaimsPrincipal user, ScoringProfileService profiles, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await profiles.SetActiveAsync(church, id, true, user.Id(), ct))
+                : Problems.NoChurch());
+
+        // Only ever a set of rules no session has used. See DeleteAsync.
+        admin.MapDelete("/{id:guid}", async (
+            Guid id, ClaimsPrincipal user, ScoringProfileService profiles, CancellationToken ct) =>
+        {
+            if (user.Church() is not { } church) return Problems.NoChurch();
+
+            var result = await profiles.DeleteAsync(church, id, user.Id(), ct);
+            return result.Ok ? Results.NoContent() : Problems.From(result.Error!);
+        });
+    }
+
     // ------------------------------------------------------------- sessions
 
     private static void MapSessions(WebApplication app)
@@ -230,6 +328,13 @@ public static class ApiEndpoints
                 ? Results.Created($"/api/sessions/{result.Value!.Id}", result.Value)
                 : Problems.From(result.Error!);
         }).RequireAuthorization(AuthPolicies.GamesLeader);
+
+        // Only while the session is still in setup. See SetScoringAsync.
+        group.MapPut("/{id:guid}/scoring", async (
+            Guid id, SetSessionScoringRequest request, ClaimsPrincipal user,
+            SessionService sessions, CancellationToken ct) =>
+            Problems.Wrap(await sessions.SetScoringAsync(id, request.ScoringProfileId, user.Id(), ct)))
+            .RequireAuthorization(AuthPolicies.GamesLeader);
 
         group.MapPost("/{id:guid}/start", async (Guid id, ClaimsPrincipal user, SessionService sessions, CancellationToken ct) =>
             Problems.Wrap(await sessions.StartAsync(id, user.Id(), ct)))

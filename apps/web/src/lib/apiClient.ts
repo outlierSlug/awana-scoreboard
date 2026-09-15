@@ -6,6 +6,10 @@ import type {
   Game,
   GameDetail,
   SaveGameRequest,
+  ScoringConfig,
+  ScoringPreview,
+  ScoringProfile,
+  SaveScoringProfileRequest,
   Preview,
   PreviewRequest,
   RoundRecorded,
@@ -145,6 +149,39 @@ export const api = {
   reorderGames: (ids: string[]) =>
     request<GameDetail[]>('PUT', '/api/catalog/games/order', { ids }),
 
+  // Scoring rules. Reading is open to a games leader, because choosing which
+  // rules a session runs under happens on the new session form.
+  scoringProfiles: (signal?: AbortSignal) =>
+    request<ScoringProfile[]>('GET', '/api/catalog/scoring-profiles', undefined, signal),
+
+  /** Nothing is written, so an unsaved edit can be checked before committing. */
+  previewScoring: (config: ScoringConfig, signal?: AbortSignal) =>
+    request<ScoringPreview>('POST', '/api/catalog/scoring-profiles/preview', config, signal),
+
+  createScoringProfile: (body: SaveScoringProfileRequest) =>
+    request<ScoringProfile>('POST', '/api/catalog/scoring-profiles', body),
+
+  updateScoringProfile: (id: string, body: SaveScoringProfileRequest) =>
+    request<ScoringProfile>('PUT', `/api/catalog/scoring-profiles/${id}`, body),
+
+  /** How anything about a read-only set gets changed: copy it, edit the copy. */
+  duplicateScoringProfile: (id: string) =>
+    request<ScoringProfile>('POST', `/api/catalog/scoring-profiles/${id}/duplicate`),
+
+  /** What a new session gets when nobody chooses. */
+  setDefaultScoringProfile: (id: string) =>
+    request<ScoringProfile[]>('POST', `/api/catalog/scoring-profiles/${id}/default`),
+
+  retireScoringProfile: (id: string) =>
+    request<ScoringProfile>('POST', `/api/catalog/scoring-profiles/${id}/retire`),
+
+  restoreScoringProfile: (id: string) =>
+    request<ScoringProfile>('POST', `/api/catalog/scoring-profiles/${id}/restore`),
+
+  /** Only ever rules no session has used. The API refuses the rest. */
+  deleteScoringProfile: (id: string) =>
+    request<void>('DELETE', `/api/catalog/scoring-profiles/${id}`),
+
   // Sessions.
   sessions: (signal?: AbortSignal) =>
     request<SessionSummary[]>('GET', '/api/sessions', undefined, signal),
@@ -152,8 +189,8 @@ export const api = {
   session: (id: string, signal?: AbortSignal) =>
     request<SessionDetail>('GET', `/api/sessions/${id}`, undefined, signal),
 
-  createSession: (divisionId: string, date: string) =>
-    request<SessionDetail>('POST', '/api/sessions', { divisionId, date }),
+  createSession: (divisionId: string, date: string, scoringProfileId?: string | null) =>
+    request<SessionDetail>('POST', '/api/sessions', { divisionId, date, scoringProfileId }),
 
   startSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/start`),
 
@@ -161,6 +198,10 @@ export const api = {
   deleteSession: (id: string) => request<void>('DELETE', `/api/sessions/${id}`),
   finishSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/finish`),
   reopenSession: (id: string) => request<Scoreboard>('POST', `/api/sessions/${id}/reopen`),
+
+  /** Only while the session is still in setup. Null means the church default. */
+  setSessionScoring: (id: string, scoringProfileId: string | null) =>
+    request<SessionDetail>('PUT', `/api/sessions/${id}/scoring`, { scoringProfileId }),
 
   // Auth.
   me: (signal?: AbortSignal) => request<Me>('GET', '/api/auth/me', undefined, signal),

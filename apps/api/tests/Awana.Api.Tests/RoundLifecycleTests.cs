@@ -483,4 +483,29 @@ public class RoundLifecycleTests(ApiFixture fixture)
 
         Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(asScorekeeper)).StatusCode);
     }
+    // ------------------------------------------------------------------- 
+
+    [Fact]
+    public async Task Sessions_list_puts_whatever_is_live_first()
+    {
+        // Date alone is not enough. A session created for next month sorts
+        // above the one running tonight, and tonight's is the reason anybody
+        // has this page open on a Friday.
+        var client = Client;
+        var (divisionId, _, _) = await fixture.FixtureIdsAsync();
+
+        var future = await CreateSessionAsync(client, divisionId, new DateOnly(2028, 6, 2));
+        var tonight = await CreateSessionAsync(client, divisionId, new DateOnly(2028, 5, 5));
+
+        await StartAsync(client, tonight.Id);
+
+        var list = await client.GetFromJsonAsync<List<SessionSummaryDto>>("/api/sessions");
+
+        var livePosition = list!.FindIndex(s => s.Id == tonight.Id);
+        var futurePosition = list.FindIndex(s => s.Id == future.Id);
+
+        Assert.True(
+            livePosition < futurePosition,
+            "The running session should sort above one dated later that has not started.");
+    }
 }

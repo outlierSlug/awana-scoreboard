@@ -1,4 +1,5 @@
 using Awana.Data.Entities;
+using Awana.Scoring;
 
 namespace Awana.Api.Contracts;
 
@@ -127,7 +128,14 @@ public sealed record SessionSummaryDto(
     SessionStatus Status,
     int RoundCount);
 
-public sealed record CreateSessionRequest(Guid DivisionId, DateOnly Date);
+/// <param name="ScoringProfileId">
+/// Which set of rules this night runs under. Null takes the church's default,
+/// which is what almost every session wants.
+/// </param>
+public sealed record CreateSessionRequest(
+    Guid DivisionId,
+    DateOnly Date,
+    Guid? ScoringProfileId = null);
 
 public sealed record SessionDetailDto(
     Guid Id,
@@ -137,9 +145,35 @@ public sealed record SessionDetailDto(
     DateOnly Date,
     SessionStatus Status,
     int Version,
+    SessionScoringDto Scoring,
     IReadOnlyList<SessionTeamDto> Teams,
     IReadOnlyList<RoundSummaryDto> Rounds,
     IReadOnlyList<AdjustmentDto> Adjustments);
+
+/// <summary>
+/// Which rules this session scores under, said out loud.
+/// </summary>
+/// <remarks>
+/// Worth showing even when the church has only one set and there was never a
+/// choice to make: a scorekeeper looking at a total should be able to see what
+/// produced it without leaving the screen.
+/// </remarks>
+/// <param name="IsFixed">
+/// True once the session has started and the rules are frozen onto it. Until
+/// then this is what it WOULD use, which is not the same promise.
+/// </param>
+/// <param name="IsDefault">
+/// True when nobody chose and this is simply the church's default. Before the
+/// session starts that means it can still change under it, if the default moves.
+/// </param>
+/// <param name="ScoringProfileId">Null puts it back on the church's default.</param>
+public sealed record SetSessionScoringRequest(Guid? ScoringProfileId);
+
+public sealed record SessionScoringDto(
+    string Name,
+    IReadOnlyList<decimal> PlacePoints,
+    bool IsFixed,
+    bool IsDefault);
 
 public sealed record SessionTeamDto(
     Guid TeamId,
@@ -202,6 +236,64 @@ public sealed record SaveGameRequest(
 /// asked for.
 /// </remarks>
 public sealed record ReorderGamesRequest(IReadOnlyList<Guid> Ids);
+
+// -------------------------------------------------------------- scoring rules
+
+/// <summary>
+/// A named set of scoring rules, as the admin screen shows it.
+/// </summary>
+/// <param name="Config">
+/// The rules themselves, in exactly the shape the engine consumes. Not
+/// remodelled into a parallel DTO: there is one definition of what a scoring
+/// rule is, and a second one would drift from the engine that executes it.
+/// </param>
+/// <param name="SessionCount">
+/// How many sessions were started from these rules. A gate rather than a
+/// statistic: zero is what makes a profile deletable, because a session that
+/// used it would otherwise lose the record of where its scoring came from.
+/// </param>
+/// <param name="IsSeeded">
+/// Came with the app, and is therefore read only even to an admin. Duplicating
+/// it is how a church gets a set it can change. See ScoringProfile.SeedKey.
+/// </param>
+public sealed record ScoringProfileDto(
+    Guid Id,
+    string Name,
+    ScoringConfig Config,
+    bool IsDefault,
+    bool IsActive,
+    int SessionCount,
+    bool IsSeeded);
+
+public sealed record SaveScoringProfileRequest(string Name, ScoringConfig Config);
+
+/// <summary>
+/// What a set of rules would do, worked through on four rounds.
+/// </summary>
+/// <remarks>
+/// Computed by the real engine on the server rather than in the browser. The
+/// whole point is that the editor shows what Friday will actually do, which a
+/// second implementation would eventually stop doing.
+/// </remarks>
+public sealed record ScoringPreviewDto(IReadOnlyList<ScoringExampleDto> Examples);
+
+/// <param name="Rejected">
+/// Set when the rules refuse this shape rather than scoring it, which is what
+/// "ties are not allowed" looks like. Not an error: it is the clearest possible
+/// demonstration of that setting.
+/// </param>
+public sealed record ScoringExampleDto(
+    string Title,
+    string Question,
+    IReadOnlyList<ScoringExampleTeamDto> Teams,
+    string? Rejected);
+
+public sealed record ScoringExampleTeamDto(
+    string TeamName,
+    int? Place,
+    bool IsDisqualified,
+    decimal Points,
+    string Explanation);
 
 /// <summary>
 /// Points a leader decided on, outside the games.

@@ -4,7 +4,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { useFlip } from '@/lib/hooks/useFlip'
 import { useScoreboard } from '@/lib/hooks/useScoreboard'
 import { useWakeLock } from '@/lib/hooks/useWakeLock'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatPoints } from '@/lib/format'
 import { SessionStatus, type LastRound, type Standing } from '@/lib/types'
 import './board.css'
 
@@ -125,7 +125,7 @@ function TeamRow({
         {team.rankChange < 0 && <ArrowDown />}
       </div>
 
-      <div className="board-points">{Math.round(team.points)}</div>
+      <div className="board-points">{formatPoints(team.points)}</div>
     </div>
   )
 }
@@ -145,7 +145,7 @@ function summarize(status: SessionStatus, lastRound: LastRound | null): string {
   const scores = lastRound.teams
     .map((team) => {
       if (team.isDisqualified) return `${team.teamName} DQ`
-      return `${team.teamName} +${Math.round(team.points)}`
+      return `${team.teamName} +${formatPoints(team.points)}`
     })
     .join(', ')
 

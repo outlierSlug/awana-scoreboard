@@ -17,13 +17,33 @@ const OPTIONS: { value: ResolvedTheme; label: string; Icon: typeof Sun }[] = [
  * driven by the RESOLVED theme, so before anyone touches it the control already
  * shows which way the system went. "System" is not offered as a third option:
  * it is the default and nobody picks it deliberately.
+ *
+ * On a phone it collapses to one button showing where it would take you, and
+ * the ambiguity is worth accepting there: the header has three destinations and
+ * a connection state to fit, and a control costing twice the width to be
+ * marginally clearer is the wrong trade at 390px.
  */
 export function ThemeToggle({ className }: { className?: string }) {
   const { resolved, setTheme } = useTheme()
 
+  const other = resolved === 'dark' ? OPTIONS[0] : OPTIONS[1]
+
   return (
-    <div
-      className={['inline-flex shrink-0 gap-0.5 rounded-lg p-0.5', className]
+    <>
+      <button
+        type="button"
+        onClick={() => setTheme(other.value)}
+        aria-label={`Switch to ${other.label.toLowerCase()} theme`}
+        title={`Switch to ${other.label.toLowerCase()}`}
+        className={['flex size-8 shrink-0 items-center justify-center rounded-lg sm:hidden', className]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <other.Icon className="size-4" />
+      </button>
+
+      <div
+      className={['hidden shrink-0 gap-0.5 rounded-lg p-0.5 sm:inline-flex', className]
         .filter(Boolean)
         .join(' ')}
       style={{ background: 'color-mix(in oklch, currentColor, transparent 92%)' }}
@@ -53,6 +73,7 @@ export function ThemeToggle({ className }: { className?: string }) {
           </button>
         )
       })}
-    </div>
+      </div>
+    </>
   )
 }

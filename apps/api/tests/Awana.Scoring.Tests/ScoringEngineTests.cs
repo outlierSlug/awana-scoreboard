@@ -551,4 +551,57 @@ public class ScoringEngineTests
         Assert.Contains("disqualified", red);
         Assert.Contains("no team was promoted", red);
     }
+    // -------------------------------------------------- fractional rounding
+
+    /// <summary>
+    /// A table whose ties do not divide evenly, which the official one always
+    /// does. Reported from the app on 2026-09-14: 100 / 75 / 50 / 25 with one
+    /// decimal place showed a four-way tie as 63 rather than 62.5. The engine
+    /// was right and every screen was rounding the answer away, but nothing
+    /// pinned the engine's half of it down.
+    /// </summary>
+    [Fact]
+    public void A_table_that_divides_unevenly_keeps_the_decimals_it_was_configured_for()
+    {
+        var config = new ScoringConfig
+        {
+            PlacePoints = [100m, 75m, 50m, 25m],
+            Rounding = new RoundingSpec(1, RoundingMode.HalfAwayFromZero),
+        };
+
+        // All four level share the whole table: 250 over four is 62.5 each.
+        var outcome = ScoreFour(1, 1, 1, 1, config);
+
+        Assert.All(outcome.Awards, a => Assert.Equal(62.5m, a.Points));
+        Assert.Equal(250m, outcome.TotalAwarded);
+    }
+
+    [Fact]
+    public void Whole_number_rounding_still_collapses_the_same_tie()
+    {
+        // The default spec, and the reason this went unnoticed: on the official
+        // table every possible split is already whole.
+        var config = new ScoringConfig { PlacePoints = [100m, 75m, 50m, 25m] };
+
+        var outcome = ScoreFour(1, 1, 1, 1, config);
+
+        Assert.All(outcome.Awards, a => Assert.Equal(63m, a.Points));
+    }
+
+    [Fact]
+    public void Two_decimal_places_survive_a_three_way_split()
+    {
+        var config = new ScoringConfig
+        {
+            PlacePoints = [100m, 75m, 50m, 25m],
+            Rounding = new RoundingSpec(2, RoundingMode.HalfAwayFromZero),
+        };
+
+        // First three tie: 100 + 75 + 50 over three is 75 exactly, and the
+        // fourth team keeps 25.
+        var outcome = ScoreFour(1, 1, 1, 2, config);
+
+        Assert.Equal(3, outcome.Awards.Count(a => a.Points == 75m));
+        Assert.Equal(25m, outcome.Awards.Single(a => a.Place == 4).Points);
+    }
 }

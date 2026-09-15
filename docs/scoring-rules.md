@@ -24,6 +24,39 @@ length and the number of teams are independent: a four entry table with six
 teams is well defined, and the fifth and sixth teams earn the "beyond table"
 value, which defaults to 0.
 
+## What the engine does not decide
+
+**Scoring is per session, never per game**, and that is a deliberate decision
+rather than something not got to yet. Considered and declined on 2026-09-14.
+
+Per session does not mean fixed. A church keeps as many named sets of rules as
+it likes at `/app/scoring`, and a session picks one when it is created. What it
+cannot do is vary the rules WITHIN a night, because then a total stops being
+explainable by one table.
+
+The engine's job starts once a finish order exists. How that order was arrived
+at is the leaders' business and never reaches the system, which is why a `Game`
+carries a name and its rules in prose and no scoring fields at all.
+
+The case that proves it is **Prize Pool**. A hula hoop of assorted items sits in
+the center circle. Everyone on each team goes once around the circle, then into
+the middle to grab one item. When the hoop is empty or time is up, the items are
+priced up: a beanbag is 3, a baton 5, a ball 1. Each team totals its haul, and
+those totals decide who came 1st, 2nd, 3rd and 4th. The scoreboard is told the
+finishing order and nothing else, and that order is then worth the ordinary
+40 / 30 / 20 / 10 like any relay.
+
+So determination is elaborate and varies enormously between games; value is
+universal. Only the second half is the engine's problem.
+
+**What per-game configuration would cost**, if a game ever genuinely needed a
+differently shaped table rather than a scaled one: a session freezes exactly one
+config when it starts, so editing a profile later cannot rewrite a night already
+played. Per-game configs put several in play per session, and the effective
+config would have to be frozen onto each `Round` as it is recorded. Without that
+second half, editing a game next March silently changes what last October's
+rounds were worth. Do not add the first half without the second.
+
 ## How a round is scored
 
 1. Every team is either **placed** at a finishing position, or marked **absent**.
@@ -115,8 +148,19 @@ Three other disqualification rules are available:
 
 ## Multipliers and bonuses
 
-A round can carry a **multiplier**, for a final round or a tug of war worth
-double. It applies to the placement points only.
+A round can carry a **multiplier**. It applies to the placement points only.
+
+It gets used for two different reasons, and they are worth telling apart:
+
+- **Stakes.** The last round or two of the night, to raise the drama. This is a
+  decision about tonight and varies from week to week.
+- **Length or effort.** Some games are simply bigger. Prize Pool takes several
+  times as long as a baton relay, so one round of it is reasonably worth two.
+  This one is a property of the game and would be the same every time it is run.
+
+Both are entered per round, which is why the multiplier lives on the `Round` and
+not on the `Game`. A game that is always worth double could carry a default that
+prefills the field, but the round would still own the number it was scored with.
 
 A team can also be given **bonus points**, for a game that awards extras. Bonuses
 are added after the multiplier, so a double round does not double a bonus. This

@@ -23,6 +23,90 @@ public sealed class ScoringEngine : IScoringEngine
     public const decimal MaxMultiplier = 100m;
     public const decimal MaxBonus = 10_000m;
 
+    /// <summary>
+    /// A table longer than this is a typo rather than a club with that many
+    /// teams. Generous next to the four this was written for.
+    /// </summary>
+    public const int MaxPlaces = 32;
+
+    /// <summary>The most any single finishing slot can be worth.</summary>
+    public const decimal MaxPlacePoints = 100_000m;
+
+    /// <summary>
+    /// Checks a set of rules on its own, before anything is scored with them.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately permissive about what is merely unusual. A table that rises
+    /// rather than falls, or one where every place is worth the same, is
+    /// strange but not wrong, and a church that wants it should be able to have
+    /// it. What is rejected is what cannot be executed or cannot be stored: an
+    /// empty table, a negative award, a number that overflows the column.
+    /// </remarks>
+    public ValidationOutcome ValidateConfig(ScoringConfig config)
+    {
+        var errors = new List<ValidationError>();
+
+        if (config.PlacePoints.Count == 0)
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.EmptyPointsTable,
+                "The points table needs at least one place."));
+        }
+
+        if (config.PlacePoints.Count > MaxPlaces)
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.PointsTableTooLong,
+                $"The points table cannot have more than {MaxPlaces} places."));
+        }
+
+        if (config.PlacePoints.Any(p => p < 0m))
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.NegativePlacePoints,
+                "A finishing place cannot be worth less than nothing."));
+        }
+
+        if (config.PlacePoints.Any(p => p > MaxPlacePoints))
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.PlacePointsTooLarge,
+                $"A finishing place cannot be worth more than {MaxPlacePoints:N0} points."));
+        }
+
+        if (config.PointsBeyondTable < 0m)
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.NegativeBeyondTable,
+                "Finishing past the end of the table cannot be worth less than nothing."));
+        }
+
+        if (config.PointsBeyondTable > MaxPlacePoints)
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.BeyondTableTooLarge,
+                $"Finishing past the end of the table cannot be worth more than {MaxPlacePoints:N0} points."));
+        }
+
+        // Allowed to be negative: a disqualification that costs the team points
+        // is a legitimate rule. Bounded in both directions all the same.
+        if (Math.Abs(config.DqPenaltyPoints) > MaxPlacePoints)
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.DqPenaltyTooLarge,
+                $"A disqualification penalty cannot be more than {MaxPlacePoints:N0} points either way."));
+        }
+
+        if (config.Rounding.Decimals is < 0 or > 9)
+        {
+            errors.Add(new ValidationError(
+                ScoringErrorCodes.InvalidRounding,
+                "Rounding must be between 0 and 9 decimal places."));
+        }
+
+        return new ValidationOutcome(errors);
+    }
+
     public ValidationOutcome Validate(RoundInput input, ScoringConfig config)
     {
         var errors = new List<ValidationError>();

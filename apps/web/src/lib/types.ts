@@ -118,6 +118,16 @@ export interface UpdateAttendanceRequest {
   teams: TeamHeadcount[]
 }
 
+/** Which rules a session scores under. Shown even when there was no choice. */
+export interface SessionScoring {
+  name: string
+  placePoints: number[]
+  /** Frozen onto the session. False while it is still in setup. */
+  isFixed: boolean
+  /** Nobody chose, so this is the church's default and can still move. */
+  isDefault: boolean
+}
+
 export interface SessionDetail {
   id: string
   slug: string
@@ -126,6 +136,7 @@ export interface SessionDetail {
   date: string
   status: SessionStatus
   version: number
+  scoring: SessionScoring
   teams: SessionTeam[]
   rounds: RoundSummary[]
   adjustments: Adjustment[]
@@ -189,6 +200,116 @@ export interface GameDetail {
   roundCount: number
   /** Came with the app. Shown as provenance only: it is edited like any other. */
   isSeeded: boolean
+}
+
+// ------------------------------------------------------------- scoring rules
+
+/** How tied teams divide the slots they consumed. Numeric, as the API sends. */
+export const TieRule = {
+  AverageSharedSlots: 0,
+  HighestSlot: 1,
+  LowestSlot: 2,
+  NoTiesAllowed: 3,
+} as const
+
+export type TieRule = (typeof TieRule)[keyof typeof TieRule]
+
+/** What happens to a disqualified team, and to the teams behind it. */
+export const DqRule = {
+  ZeroButHoldSlot: 0,
+  DropToLast: 1,
+  CustomPenalty: 2,
+  ZeroAndPromoteOthers: 3,
+} as const
+
+export type DqRule = (typeof DqRule)[keyof typeof DqRule]
+
+export const RoundingMode = {
+  HalfAwayFromZero: 0,
+  HalfToEven: 1,
+} as const
+
+export type RoundingMode = (typeof RoundingMode)[keyof typeof RoundingMode]
+
+export interface RoundingSpec {
+  decimals: number
+  mode: RoundingMode
+}
+
+/**
+ * Everything a church can configure about scoring.
+ *
+ * Mirrors Awana.Scoring.ScoringConfig field for field. The engine is the only
+ * thing that executes these, so the shape is copied rather than reinterpreted.
+ */
+export interface ScoringConfig {
+  /** Points per finishing slot, best first. The official default is 40/30/20/10. */
+  placePoints: number[]
+  /** What a team earns finishing past the end of the table. */
+  pointsBeyondTable: number
+  tieRule: TieRule
+  dqRule: DqRule
+  /** Used only when dqRule is CustomPenalty. */
+  dqPenaltyPoints: number
+  allowUnplacedTeams: boolean
+  rounding: RoundingSpec
+}
+
+/** A named set of scoring rules. */
+export interface ScoringProfile {
+  id: string
+  name: string
+  config: ScoringConfig
+  /** What a new session gets when nobody chooses. Exactly one is true. */
+  isDefault: boolean
+  isActive: boolean
+  /**
+   * A gate, not a statistic. Zero is what makes a profile deletable, because a
+   * session that used it would otherwise lose the record of its scoring.
+   */
+  sessionCount: number
+  /**
+   * Came with the app, and is therefore read only even to an admin: the name is
+   * a claim about a standard. Duplicate it to get a set you can change.
+   */
+  isSeeded: boolean
+}
+
+export interface SaveScoringProfileRequest {
+  name: string
+  config: ScoringConfig
+}
+
+/** What a set of rules would do, worked through by the real engine. */
+export interface ScoringPreview {
+  examples: ScoringExample[]
+}
+
+export interface ScoringExample {
+  title: string
+  question: string
+  teams: ScoringExampleTeam[]
+  /** Set when the rules refuse this shape rather than scoring it. */
+  rejected: string | null
+}
+
+export interface ScoringExampleTeam {
+  teamName: string
+  place: number | null
+  isDisqualified: boolean
+  points: number
+  explanation: string
+}
+
+/** The rules every church starts from, and what a new set is seeded with. */
+export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
+  placePoints: [40, 30, 20, 10],
+  pointsBeyondTable: 0,
+  tieRule: TieRule.AverageSharedSlots,
+  dqRule: DqRule.ZeroButHoldSlot,
+  dqPenaltyPoints: 0,
+  allowUnplacedTeams: true,
+  rounding: { decimals: 0, mode: RoundingMode.HalfAwayFromZero },
 }
 
 /** The editable half of a game. The same shape creates one and updates one. */

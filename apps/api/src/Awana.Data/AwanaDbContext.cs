@@ -109,6 +109,13 @@ public class AwanaDbContext(DbContextOptions<AwanaDbContext> options) : DbContex
 
         e.HasIndex(x => new { x.ChurchId, x.Name }).IsUnique();
 
+        // Unique so the seeder matches one row per seed. Filtered, because
+        // every set a church adds itself carries null.
+        e.Property(x => x.SeedKey).HasMaxLength(60);
+        e.HasIndex(x => new { x.ChurchId, x.SeedKey })
+            .IsUnique()
+            .HasFilter("seed_key IS NOT NULL");
+
         e.HasOne(x => x.Church).WithMany(c => c.ScoringProfiles).HasForeignKey(x => x.ChurchId);
     });
 

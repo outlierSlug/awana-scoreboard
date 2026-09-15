@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ExternalLink, Flag, Play, RotateCcw, Users } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Flag, Info, Play, RotateCcw, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -7,6 +7,7 @@ import { FinalStandings } from '@/components/round/FinalStandings'
 import { TeamsDialog } from '@/components/round/TeamsDialog'
 import { RoundEntry } from '@/components/round/RoundEntry'
 import { RoundHistory } from '@/components/round/RoundHistory'
+import { SessionsHelpDialog } from '@/components/round/SessionsHelpDialog'
 import { SessionStatusLabel } from '@/components/SessionStatusLabel'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -14,6 +15,7 @@ import { Modal } from '@/components/ui/Modal'
 import { useMe } from '@/lib/auth'
 import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
+import type { ScoringProfile } from '@/lib/types'
 import {
   SessionStatus,
   UserRole,
@@ -32,6 +34,7 @@ export function ConsolePage() {
   // the dialog is submitted, and closing the dialog changes nothing.
   const [editing, setEditing] = useState<{ round: RoundSummary; label: string } | null>(null)
   const [finishing, setFinishing] = useState(false)
+  const [helping, setHelping] = useState(false)
   const [teamsOpen, setTeamsOpen] = useState(false)
 
   // A tie takes over the whole page, not just the form. Everything that is not
@@ -62,6 +65,21 @@ export function ConsolePage() {
     queryKey: queryKeys.scoreboard(session.data?.slug ?? ''),
     queryFn: ({ signal }) => api.publicScoreboard(session.data!.slug, signal),
     enabled: session.data?.status === SessionStatus.Finished,
+  })
+
+  // Only while the session is still in setup and this person could change it.
+  const scoringProfiles = useQuery<ScoringProfile[]>({
+    queryKey: queryKeys.scoringProfiles(),
+    queryFn: ({ signal }) => api.scoringProfiles(signal),
+    enabled: session.data?.status === SessionStatus.Setup && canRunSession,
+    staleTime: 5 * 60_000,
+  })
+
+  const setScoring = useMutation({
+    mutationFn: (scoringProfileId: string | null) => api.setSessionScoring(id!, scoringProfileId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.session(id!) })
+    },
   })
 
   const refresh = async () => {
@@ -153,16 +171,48 @@ export function ConsolePage() {
         </Button>
 
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h1 className="text-2xl font-bold tracking-tight">{data.divisionName} Games</h1>
+
               {/* Said outright rather than left to be inferred from which
                   buttons happen to be on screen. */}
               <SessionStatusLabel status={data.status} />
+
+              {/* Reachable from the screen it describes, rather than only from
+                  the list somebody has already navigated away from. */}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="How sessions work"
+                onClick={() => setHelping(true)}
+              >
+                <Info />
+              </Button>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {formatDate(data.date)} · {liveRounds.length}{' '}
-              {liveRounds.length === 1 ? 'round' : 'rounds'} recorded
+
+            {/* One line rather than three. Date, count and rules are all the
+                same kind of fact about tonight, and stacking them made the
+                header taller than the thing it labels. */}
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+              <span>{formatDate(data.date)}</span>
+
+              <span aria-hidden>·</span>
+              <span>
+                {liveRounds.length} {liveRounds.length === 1 ? 'round' : 'rounds'}
+              </span>
+
+              <span aria-hidden>·</span>
+              <span
+                title={
+                  data.scoring.isFixed
+                    ? 'Fixed when this session started'
+                    : 'Fixed when the session starts'
+                }
+              >
+                <span className="font-medium text-foreground">{data.scoring.name}</span>
+                <span className="tabular-nums"> {data.scoring.placePoints.join('/')}</span>
+              </span>
             </p>
           </div>
 
@@ -223,6 +273,51 @@ export function ConsolePage() {
             Starting locks tonight&rsquo;s scoring rules onto this session. Changing the scoring
             profile later will not alter these results.
           </p>
+
+          {/* The last moment these can be changed, offered where that is said.
+              Only when there is more than one set to choose between, matching
+              the new session form. */}
+          {canRunSession && (scoringProfiles.data ?? []).filter((p) => p.isActive).length > 1 && (
+            <div className="mt-4">
+              <span className="mb-2 block text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                Scoring
+              </span>
+
+              <div className="flex flex-wrap gap-2">
+                {(scoringProfiles.data ?? [])
+                  .filter((profile) => profile.isActive)
+                  .map((profile) => {
+                    // The session reports the default by name, so a set that
+                    // IS the default matches either way it was arrived at.
+                    const selected = data.scoring.isDefault
+                      ? profile.isDefault
+                      : data.scoring.name === profile.name
+
+                    return (
+                      <button
+                        key={profile.id}
+                        type="button"
+                        disabled={setScoring.isPending}
+                        aria-pressed={selected}
+                        onClick={() => setScoring.mutate(profile.isDefault ? null : profile.id)}
+                        className={[
+                          'h-10 rounded-lg border px-3 text-sm font-semibold transition-colors',
+                          selected
+                            ? 'border-foreground bg-primary text-primary-foreground'
+                            : 'border-border bg-background hover:bg-muted',
+                        ].join(' ')}
+                      >
+                        {profile.name}
+                      </button>
+                    )
+                  })}
+              </div>
+
+              {setScoring.error instanceof ApiError && (
+                <p className="mt-2 text-sm text-destructive">{setScoring.error.message}</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -297,6 +392,8 @@ export function ConsolePage() {
         </ErrorBoundary>
       </div>
 
+      <SessionsHelpDialog open={helping} onClose={() => setHelping(false)} />
+
       <TeamsDialog
         open={teamsOpen}
         onClose={() => setTeamsOpen(false)}
@@ -321,8 +418,8 @@ export function ConsolePage() {
         onConfirm={() => finish.mutate()}
       >
         <p>
-          The board stops taking rounds and shows tonight&rsquo;s final standings. You can reopen
-          the session afterwards if there is another round to play.
+          End tonight's session and mark it as finished. No more rounds can be added, and the scoreboard
+          will be finalized. Only an admin can reopen a finished session.
         </p>
       </ConfirmDialog>
 

@@ -13,11 +13,20 @@ public class SessionService(
     ScoreboardService scoreboard,
     IScoreboardBroadcaster broadcaster)
 {
+    /// <summary>
+    /// Every session, with whatever is live at the top.
+    /// </summary>
+    /// <remarks>
+    /// Live first, then newest date first. Date alone is not enough: a session
+    /// created for next month sorts above the one running tonight, and tonight's
+    /// is the whole reason anybody has this page open on a Friday.
+    /// </remarks>
     public async Task<IReadOnlyList<SessionSummaryDto>> ListAsync(CancellationToken ct = default) =>
         await db.Sessions
             .AsNoTracking()
             .Include(s => s.Division)
-            .OrderByDescending(s => s.Date)
+            .OrderByDescending(s => s.Status == SessionStatus.Running)
+            .ThenByDescending(s => s.Date)
             .ThenBy(s => s.Division.SortOrder)
             .Select(s => new SessionSummaryDto(
                 s.Id,
@@ -34,7 +43,11 @@ public class SessionService(
             .AsNoTracking()
             .Include(s => s.Division)
             .Where(s => s.Church.Slug == churchSlug && s.Status == SessionStatus.Running)
-            .OrderBy(s => s.Division.SortOrder)
+            // Normally all of one night, where the division order is what shows.
+            // Dated first anyway, so a session left running from a past week
+            // cannot sit above tonight's.
+            .OrderByDescending(s => s.Date)
+            .ThenBy(s => s.Division.SortOrder)
             .Select(s => new SessionSummaryDto(
                 s.Id,
                 s.PublicSlug,
@@ -91,6 +104,8 @@ public class SessionService(
         var headcounts = session.SessionTeams.ToDictionary(st => st.TeamId, st => st.Headcount);
         var byId = teams.ToDictionary(t => t.Id);
 
+        var scoring = await DescribeScoringAsync(session, ct);
+
         return ServiceResult<SessionDetailDto>.Success(new SessionDetailDto(
             session.Id,
             session.PublicSlug,
@@ -99,6 +114,7 @@ public class SessionService(
             session.Date,
             session.Status,
             session.Version,
+            scoring,
             teams.Select(t => new SessionTeamDto(
                 t.Id, t.Name, t.ColorHex, t.TextOnColorHex,
                 headcounts.GetValueOrDefault(t.Id))).ToList(),
@@ -143,11 +159,63 @@ public class SessionService(
                 .ToList()));
     }
 
+    /// <summary>
+    /// What this session scores under, before or after it has started.
+    /// </summary>
+    /// <remarks>
+    /// After starting, the numbers come from the session's own frozen copy,
+    /// which is the only honest source: the profile it was taken from may have
+    /// been edited since. The NAME still comes from the profile, so a profile
+    /// renamed later reads by its current name, the same way a renamed game
+    /// does throughout the history.
+    /// </remarks>
+    private async Task<SessionScoringDto> DescribeScoringAsync(Session session, CancellationToken ct)
+    {
+        var chosen = session.ScoringProfileId is { } id
+            ? await db.ScoringProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct)
+            : null;
+
+        // Nothing chosen means the default, which is also what StartAsync will
+        // reach for. Resolved the same way here so the screen does not promise
+        // something different from what will happen.
+        var fallback = chosen is null
+            ? await db.ScoringProfiles
+                .AsNoTracking()
+                .Where(p => p.ChurchId == session.ChurchId && p.IsActive)
+                .OrderByDescending(p => p.IsDefault)
+                .FirstOrDefaultAsync(ct)
+            : null;
+
+        var profile = chosen ?? fallback;
+        var isFixed = session.ScoringConfig is not null;
+
+        return new SessionScoringDto(
+            profile?.Name ?? "Built-in default",
+            session.ScoringConfig?.PlacePoints ?? profile?.Config.PlacePoints ?? ScoringConfig.Default.PlacePoints,
+            isFixed,
+            chosen is null);
+    }
+
     public async Task<ServiceResult<SessionDetailDto>> CreateAsync(
         CreateSessionRequest request, Guid? userId, CancellationToken ct = default)
     {
         var division = await db.Divisions.FirstOrDefaultAsync(d => d.Id == request.DivisionId, ct);
         if (division is null) return ServiceResult<SessionDetailDto>.Fail(ServiceError.NotFound("Division"));
+
+        // Chosen now, frozen at start. Recording the choice here rather than
+        // resolving it immediately is what lets a session be made in advance
+        // and still pick up a correction to the rules before the night begins.
+        if (request.ScoringProfileId is { } profileId)
+        {
+            var usable = await db.ScoringProfiles.AnyAsync(
+                p => p.Id == profileId && p.ChurchId == division.ChurchId && p.IsActive, ct);
+
+            if (!usable)
+            {
+                return ServiceResult<SessionDetailDto>.Fail(
+                    ServiceError.Invalid("Those scoring rules do not exist, or have been retired."));
+            }
+        }
 
         var session = new Session
         {
@@ -156,10 +224,58 @@ public class SessionService(
             Date = request.Date,
             PublicSlug = await UniqueSlugAsync(division.Slug, request.Date, ct),
             Status = SessionStatus.Setup,
+            ScoringProfileId = request.ScoringProfileId,
             CreatedByUserId = userId,
         };
 
         db.Sessions.Add(session);
+        await db.SaveChangesAsync(ct);
+
+        return await GetAsync(session.Id, ct);
+    }
+
+    /// <summary>
+    /// Changes which rules a session will run under, before it has started.
+    /// </summary>
+    /// <remarks>
+    /// Only in setup, and that is the whole point of the guard rather than
+    /// caution: a running session has already frozen its copy of the rules, so
+    /// moving the pointer afterwards would leave it naming one set of rules and
+    /// scoring by another. A night made a week in advance, though, has decided
+    /// nothing yet, and the choice made at creation should not be final.
+    /// </remarks>
+    public async Task<ServiceResult<SessionDetailDto>> SetScoringAsync(
+        Guid id, Guid? scoringProfileId, Guid? userId, CancellationToken ct = default)
+    {
+        var session = await db.Sessions.FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (session is null) return ServiceResult<SessionDetailDto>.Fail(ServiceError.NotFound("Session"));
+
+        if (session.Status != SessionStatus.Setup)
+        {
+            return ServiceResult<SessionDetailDto>.Fail(ServiceError.Conflict(
+                "session_already_started",
+                "This session has already started, so its scoring rules are fixed. They cannot be changed now."));
+        }
+
+        if (scoringProfileId is { } profileId)
+        {
+            var usable = await db.ScoringProfiles.AnyAsync(
+                p => p.Id == profileId && p.ChurchId == session.ChurchId && p.IsActive, ct);
+
+            if (!usable)
+            {
+                return ServiceResult<SessionDetailDto>.Fail(
+                    ServiceError.Invalid("Those scoring rules do not exist, or have been retired."));
+            }
+        }
+
+        session.ScoringProfileId = scoringProfileId;
+
+        AddAudit(session, userId, "session.scoring_set", nameof(Session), session.Id, new
+        {
+            ScoringProfileId = scoringProfileId,
+        });
+
         await db.SaveChangesAsync(ct);
 
         return await GetAsync(session.Id, ct);
@@ -182,11 +298,17 @@ public class SessionService(
                 "session_already_started", "Only a session in setup can be started."));
         }
 
-        var profile = await db.ScoringProfiles
-            .AsNoTracking()
-            .Where(p => p.ChurchId == session.ChurchId && p.IsActive)
-            .OrderByDescending(p => p.IsDefault)
-            .FirstOrDefaultAsync(ct);
+        // The set chosen when the session was made, if one was, and otherwise
+        // the church's default. A profile retired between creating the session
+        // and starting it is still honored: the choice was made deliberately
+        // and the night should run under the rules it was set up with.
+        var profile = session.ScoringProfileId is { } chosen
+            ? await db.ScoringProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == chosen, ct)
+            : await db.ScoringProfiles
+                .AsNoTracking()
+                .Where(p => p.ChurchId == session.ChurchId && p.IsActive)
+                .OrderByDescending(p => p.IsDefault)
+                .FirstOrDefaultAsync(ct);
 
         session.ScoringProfileId = profile?.Id;
         session.ScoringConfig = profile?.Config ?? ScoringConfig.Default;

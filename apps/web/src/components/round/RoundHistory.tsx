@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { RoundSummary, SessionTeam } from '@/lib/types'
+import { formatPoints } from '@/lib/format'
 
 /** How many rounds the list shows before it asks to be opened. */
 const COLLAPSED_ROUNDS = 5
@@ -115,7 +116,7 @@ export function RoundHistory({
                     />
                     {team.teamName}{' '}
                     <span className="font-semibold text-foreground tabular-nums">
-                      {Math.round(team.points)}
+                      {formatPoints(team.points)}
                     </span>
                     {team.isDisqualified ? ' (DQ)' : ''}
                   </span>
@@ -150,8 +151,8 @@ export function RoundHistory({
         }}
       >
         <p>
-          Its points come off the board straight away and the rounds after it move up a number. To
-          fix a wrong place or score instead, use Edit.
+          This round and its points will be removed. This action cannot be undone.
+          To fix a mistake, use Edit instead.
         </p>
       </ConfirmDialog>
     </section>

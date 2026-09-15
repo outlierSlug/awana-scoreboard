@@ -9,6 +9,17 @@ public interface IScoringEngine
     ValidationOutcome Validate(RoundInput input, ScoringConfig config);
 
     /// <summary>
+    /// Checks whether a set of rules can be used at all, with no round in hand.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the round check because it answers a different question at
+    /// a different time: this is what stands between somebody editing a scoring
+    /// profile and a Friday night discovering the table is empty. The engine
+    /// owns it because the engine is what has to execute the result.
+    /// </remarks>
+    ValidationOutcome ValidateConfig(ScoringConfig config);
+
+    /// <summary>
     /// Scores a round. Throws <see cref="ScoringValidationException"/> if the
     /// input is invalid, so the caller is expected to have run
     /// <see cref="Validate"/> first and shown the reasons to the scorekeeper.

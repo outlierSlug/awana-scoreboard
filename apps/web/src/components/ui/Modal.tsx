@@ -32,8 +32,20 @@ export function Modal({
   useEffect(() => {
     if (!dialog) return
 
-    if (open && !dialog.open) dialog.showModal()
-    else if (!open && dialog.open) dialog.close()
+    if (open && !dialog.open) {
+      dialog.showModal()
+
+      // Opened at the top, every time. A dialog keeps the scroll position it
+      // was left at, so on a phone, where a long one is genuinely scrollable,
+      // reopening it lands halfway down the form it was closed from.
+      //
+      // The rule below sees a value from useState being written to. It is a DOM
+      // element and scrollTop is an imperative property on it, not React state.
+      // eslint-disable-next-line react/immutability
+      dialog.scrollTop = 0
+    } else if (!open && dialog.open) {
+      dialog.close()
+    }
   }, [open, dialog])
 
   return (

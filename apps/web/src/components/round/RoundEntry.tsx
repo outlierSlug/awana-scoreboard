@@ -26,6 +26,7 @@ import {
   type DraftAction,
   type DraftState,
 } from '@/lib/roundDraft'
+import { formatPoints } from '@/lib/format'
 import type {
   Game,
   Preview,
@@ -528,8 +529,7 @@ export function RoundEntry({
       >
         <p>
           {gameName}
-          {draft.multiplier !== 1 && `, worth ×${draft.multiplier}`}. This goes on the board right
-          away.
+          {draft.multiplier !== 1 && `, worth ×${draft.multiplier}`}. This updates the scoreboard right away.
         </p>
 
         <ul className="mt-3 flex flex-col gap-1.5">
@@ -552,7 +552,7 @@ export function RoundEntry({
                   <span className="text-xs font-bold text-destructive">DQ</span>
                 )}
                 <span className="ml-auto text-sm font-bold tabular-nums text-foreground">
-                  {pointsFor.has(teamId) ? Math.round(pointsFor.get(teamId)!) : '...'}
+                  {pointsFor.has(teamId) ? formatPoints(pointsFor.get(teamId)!) : '...'}
                 </span>
               </li>
             )),
@@ -604,10 +604,19 @@ function GamePicker({
         {/* Nothing preselected. Picking the game is the first deliberate act of
             the round, and a default is the kind of thing that goes unnoticed and
             then has to be corrected after the fact. */}
+        {/* Ringed until something is chosen. Everything below this control is
+            inert without a game, and an empty dropdown that looks like every
+            other control gives no clue that it is the thing holding the screen
+            up. The ring goes the moment it has an answer. */}
         <Select value={gameId ?? undefined} disabled={disabled} onValueChange={onGame}>
           <SelectTrigger
             ref={setTrigger}
-            className="h-11 w-full text-sm font-medium data-[size=default]:h-11"
+            className={[
+              'h-11 w-full text-sm font-medium data-[size=default]:h-11',
+              gameId || disabled
+                ? ''
+                : 'border-[var(--color-needs-input)] ring-2 ring-[color-mix(in_oklch,var(--color-needs-input),transparent_65%)]',
+            ].join(' ')}
             aria-label="Game"
           >
             <SelectValue placeholder="Select a game..." />
@@ -776,7 +785,7 @@ function TeamLine({
           dq ? 'text-muted-foreground' : '',
         ].join(' ')}
       >
-        {points === undefined ? '' : Math.round(points)}
+        {points === undefined ? '' : formatPoints(points)}
       </span>
     </div>
   )

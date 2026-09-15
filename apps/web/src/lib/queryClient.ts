@@ -15,6 +15,7 @@ export const queryKeys = {
   divisions: () => ['divisions'] as const,
   games: () => ['games'] as const,
   gameCatalog: () => ['game-catalog'] as const,
+  scoringProfiles: () => ['scoring-profiles'] as const,
 }
 
 /**

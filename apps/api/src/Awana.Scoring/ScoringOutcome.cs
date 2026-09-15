@@ -55,4 +55,12 @@ public static class ScoringErrorCodes
     public const string BonusTooLarge = "scoring.bonus_too_large";
     public const string EmptyPointsTable = "scoring.empty_points_table";
     public const string InvalidRounding = "scoring.invalid_rounding";
+
+    // Rules being edited, rather than a round being scored.
+    public const string PointsTableTooLong = "scoring.points_table_too_long";
+    public const string NegativePlacePoints = "scoring.negative_place_points";
+    public const string PlacePointsTooLarge = "scoring.place_points_too_large";
+    public const string NegativeBeyondTable = "scoring.negative_beyond_table";
+    public const string BeyondTableTooLarge = "scoring.beyond_table_too_large";
+    public const string DqPenaltyTooLarge = "scoring.dq_penalty_too_large";
 }

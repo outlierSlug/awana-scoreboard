@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useDebounced } from '@/lib/hooks/useDebounced'
 import type { Adjustment, SessionTeam } from '@/lib/types'
+import { formatPoints } from '@/lib/format'
 
 /**
  * The per-team things that are not a round.
@@ -280,7 +281,7 @@ function Points({
                   ].join(' ')}
                 >
                   {adjustment.points > 0 ? '+' : ''}
-                  {Math.round(adjustment.points)}
+                  {formatPoints(adjustment.points)}
                 </span>
 
                 {editable && (

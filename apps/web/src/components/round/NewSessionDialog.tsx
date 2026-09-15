@@ -6,7 +6,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ApiError } from '@/lib/apiClient'
 import { formatDate } from '@/lib/format'
-import type { Division, SessionSummary } from '@/lib/types'
+import type { Division, ScoringProfile, SessionSummary } from '@/lib/types'
 
 /**
  * A session, set up and started in one go.
@@ -23,6 +23,7 @@ export function NewSessionDialog({
   onClose,
   divisions,
   existing,
+  scoringProfiles,
   busy,
   error,
   onCreate,
@@ -32,9 +33,16 @@ export function NewSessionDialog({
   divisions: Division[]
   /** Already created, so the same night cannot be made twice by accident. */
   existing: SessionSummary[]
+  /** Active sets only. Offered when there is more than one to choose between. */
+  scoringProfiles: ScoringProfile[]
   busy: boolean
   error: unknown
-  onCreate: (divisionId: string, date: string, start: boolean) => void
+  onCreate: (
+    divisionId: string,
+    date: string,
+    start: boolean,
+    scoringProfileId: string | null,
+  ) => void
 }) {
   return (
     <Modal open={open} onClose={onClose} locked={busy}>
@@ -43,6 +51,7 @@ export function NewSessionDialog({
       <Form
         divisions={divisions}
         existing={existing}
+        scoringProfiles={scoringProfiles}
         busy={busy}
         error={error}
         onClose={onClose}
@@ -55,6 +64,7 @@ export function NewSessionDialog({
 function Form({
   divisions,
   existing,
+  scoringProfiles,
   busy,
   error,
   onClose,
@@ -62,14 +72,24 @@ function Form({
 }: {
   divisions: Division[]
   existing: SessionSummary[]
+  scoringProfiles: ScoringProfile[]
   busy: boolean
   error: unknown
   onClose: () => void
-  onCreate: (divisionId: string, date: string, start: boolean) => void
+  onCreate: (
+    divisionId: string,
+    date: string,
+    start: boolean,
+    scoringProfileId: string | null,
+  ) => void
 }) {
   const [divisionId, setDivisionId] = useState(divisions[0]?.id ?? '')
   const [date, setDate] = useState(() => toDayString(new Date()))
   const [calendarOpen, setCalendarOpen] = useState(false)
+
+  // Null means "whatever the default is", which is what almost every session
+  // wants and what the API does with a null.
+  const [profileId, setProfileId] = useState<string | null>(null)
 
   // Asked of the DOM rather than threaded down: whatever the trigger sits in
   // is the right place to portal to, and nothing can disagree with it.
@@ -141,6 +161,48 @@ function Form({
         </Popover>
       </div>
 
+      {/* Always said, even when there is nothing to decide. A session should
+          state what it will be scored under; only the CHOOSING is conditional
+          on the church having more than one set. */}
+      {scoringProfiles.length === 1 && (
+        <div>
+          <Label>Scoring</Label>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{scoringProfiles[0].name}</span>
+            <span className="tabular-nums"> · {scoringProfiles[0].config.placePoints.join(' / ')}</span>
+          </p>
+        </div>
+      )}
+
+      {scoringProfiles.length > 1 && (
+        <div>
+          <Label>Scoring</Label>
+          <div className="flex flex-wrap gap-2">
+            {scoringProfiles.map((profile) => {
+              const selected =
+                profileId === profile.id || (profileId === null && profile.isDefault)
+
+              return (
+                <button
+                  key={profile.id}
+                  type="button"
+                  onClick={() => setProfileId(profile.id)}
+                  aria-pressed={selected}
+                  className={[
+                    'h-11 rounded-lg border px-3 text-sm font-semibold transition-colors',
+                    selected
+                      ? 'border-foreground bg-primary text-primary-foreground'
+                      : 'border-border bg-background hover:bg-muted',
+                  ].join(' ')}
+                >
+                  {profile.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {clash && (
         <p className="flex items-start gap-2 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
@@ -158,10 +220,14 @@ function Form({
           size="lg"
           className="h-12"
           disabled={!ready}
-          onClick={() => onCreate(divisionId, date, true)}
+          onClick={() => onCreate(divisionId, date, true, profileId)}
         >
           <Play />
-          {busy ? 'Working...' : 'Create and start'}
+          {/* Named for what it does rather than for the two calls behind it.
+              A session made in advance is started by a button with this same
+              label on the setup screen, and the two routes to a live session
+              should not be two different words for starting one. */}
+          {busy ? 'Working...' : 'Start session'}
         </Button>
 
         {/* Starting freezes tonight's scoring rules onto the session and
@@ -176,7 +242,7 @@ function Form({
             variant="outline"
             className="flex-1"
             disabled={!ready}
-            onClick={() => onCreate(divisionId, date, false)}
+            onClick={() => onCreate(divisionId, date, false, profileId)}
           >
             Create for later
           </Button>

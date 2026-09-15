@@ -52,10 +52,10 @@ export function LoginPage({ denied = false }: { denied?: boolean }) {
 
             <CardDescription className="leading-relaxed">
               {denied
-                ? 'Ask an admin to add your address, then sign in again. Any Google address works once it has been added, so it does not have to be a church one.'
+                ? 'Ask an admin to add your email address, then sign in again. Only verified accounts can access the scorekeeper console.'
                 : isSignedIn
                   ? 'You are already signed in.'
-                  : 'Recording and correcting rounds needs an account.'}
+                  : 'Sign-in with a verified account to access the scorekeeper console.'}
             </CardDescription>
           </CardHeader>
 

@@ -31,6 +31,20 @@ public class ScoringProfile
     /// <summary>Used for new sessions when none is chosen explicitly.</summary>
     public bool IsDefault { get; set; }
 
+    /// <summary>
+    /// Which seed row created this. Null on anything a church made itself.
+    /// </summary>
+    /// <remarks>
+    /// A seeded set is READ ONLY, including to an admin, and that is about the
+    /// name rather than about trust. A set called "Official AWANA" is a claim
+    /// that it holds the official table, and one that has been edited into
+    /// 50 / 25 / 15 / 10 makes the name a lie to whoever reads it next. The
+    /// answer to wanting different numbers is to duplicate it, which is almost
+    /// always what was meant anyway: a tournament table is the official one
+    /// with a number changed, not a redefinition of the standard.
+    /// </remarks>
+    public string? SeedKey { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

@@ -18,6 +18,7 @@ builder.Services.AddScoped<ScoreboardService>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddScoped<RoundService>();
 builder.Services.AddScoped<GameService>();
+builder.Services.AddScoped<ScoringProfileService>();
 builder.Services.AddSingleton<IScoreboardBroadcaster, ScoreboardBroadcaster>();
 
 // Google sign-in onto a cookie session, plus the role policies. Registered

@@ -23,7 +23,11 @@ export function AppShell() {
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
+        {/* Tighter at phone width, where three nav items plus the controls on
+            the right already run past a 390px screen. Overflowing here is not a
+            local problem: it widens the document, and a dialog sized in
+            percentages then inherits the wider page and hangs off both edges. */}
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4">
           <Link to="/" className="flex shrink-0 items-center gap-2 font-semibold">
             <ClipboardList className="size-5" />
             {/* The wordmark is the first thing to go on a narrow phone. The
@@ -32,15 +36,22 @@ export function AppShell() {
             <span className="hidden sm:inline">Awana Scoreboard</span>
           </Link>
 
-          <nav className="flex items-center gap-1">
+          {/* Scrolls rather than pushes, so adding a fourth destination later
+              cannot break the layout again. The scrollbar is hidden: this is a
+              row of three links, not a scroll region anybody should see. */}
+          <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] sm:gap-1 [&::-webkit-scrollbar]:hidden">
             <ShellLink to="/app/sessions">Sessions</ShellLink>
             {/* Editing the catalog takes a games leader, and the page says so
                 rather than vanishing: a scorekeeper who cannot find Games at
                 all has no way to learn who to ask. */}
             <ShellLink to="/app/games">Games</ShellLink>
+            {/* Visible to everyone signed in, like Games: the page itself says
+                who can change what, which a scorekeeper cannot learn from a
+                link that is simply not there. */}
+            <ShellLink to="/app/scoring">Scoring</ShellLink>
           </nav>
 
-          <div className="ml-auto flex min-w-0 items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
             <ConnectionDot
               className="min-w-0 text-xs text-muted-foreground"
               labelClassName="hidden truncate sm:inline"
@@ -90,7 +101,7 @@ function ShellLink({ to, children }: { to: string; children: React.ReactNode }) 
       to={to}
       className={({ isActive }) =>
         [
-          'rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors',
+          'shrink-0 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors sm:px-2.5',
           isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
         ].join(' ')
       }
