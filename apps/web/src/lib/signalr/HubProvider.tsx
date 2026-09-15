@@ -76,6 +76,16 @@ export function HubProvider({ children }: { children: ReactNode }) {
       // Status is the part of a session summary that moves, so the list wants
       // the same nudge. Only refetches where it is actually on screen.
       void queryClient.invalidateQueries({ queryKey: queryKeys.sessions() })
+
+      // The public lists too, and BOTH of them, because finishing a session
+      // moves it from one to the other. Invalidating only the live list is
+      // what made a finished session vanish rather than arrive: it left the
+      // list that was being refreshed and joined the one that was not.
+      //
+      // Keyed without a church, so this matches whichever church's copy is on
+      // screen without the real-time layer having to know which that is.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.liveSessionsAll })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.finishedSessionsAll })
     },
     [queryClient],
   )

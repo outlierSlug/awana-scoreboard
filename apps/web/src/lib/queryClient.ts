@@ -9,6 +9,14 @@ export const queryKeys = {
   scoreboard: (slug: string) => ['scoreboard', slug] as const,
   liveSessions: (church: string) => ['live-sessions', church] as const,
   finishedSessions: (church: string) => ['finished-sessions', church] as const,
+
+  /**
+   * The same two lists without a church, for invalidating them from the
+   * real-time layer, which knows a session changed but not whose church it is.
+   * A partial key matches every church's copy, and in v1 there is one.
+   */
+  liveSessionsAll: ['live-sessions'] as const,
+  finishedSessionsAll: ['finished-sessions'] as const,
   me: () => ['me'] as const,
   sessions: () => ['sessions'] as const,
   session: (id: string) => ['session', id] as const,

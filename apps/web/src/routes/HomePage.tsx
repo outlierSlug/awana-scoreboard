@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { ArrowRight, History, MonitorPlay, Radio } from 'lucide-react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
+import { useHub } from '@/lib/signalr/hubContext'
 import { formatDate } from '@/lib/format'
 import type { SessionSummary } from '@/lib/types'
 
@@ -37,7 +39,38 @@ export function HomePage() {
   const finished = useQuery<SessionSummary[]>({
     queryKey: queryKeys.finishedSessions(church),
     queryFn: ({ signal }) => api.finishedSessions(church, signal),
+
+    // This list is the other half of finishing a session, and it had neither a
+    // poll nor anything pushing to it. So a session that ended did not move
+    // from one list to the other, it disappeared: gone from live, which does
+    // refresh, and absent from here until somebody reloaded the page.
+    //
+    // Slower than the live list on purpose. A session finishes once a night,
+    // and the push below is what makes it feel immediate; this is only the
+    // backstop for a screen whose connection is down.
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
   })
+
+  // Watch whatever is live, so the page hears about it rather than waiting for
+  // the next poll.
+  //
+  // Polling alone left the round count on this page up to fifteen seconds
+  // behind the board next to it, which reads as broken even though it is only
+  // late. Joining each live session's group is what the board already does;
+  // the pushes land as invalidations, so both lists above re-read.
+  const { join, leave } = useHub()
+  const liveIds = (data ?? []).map((session) => session.id).join(',')
+
+  useEffect(() => {
+    if (!liveIds) return
+
+    const ids = liveIds.split(',')
+    for (const id of ids) join(id)
+    return () => {
+      for (const id of ids) leave(id)
+    }
+  }, [liveIds, join, leave])
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
