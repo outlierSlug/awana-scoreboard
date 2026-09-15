@@ -22,6 +22,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # For .github/backup-recipient.txt, and nothing else. Without this the
+      # workspace is empty and the recipient key is simply not there, which is
+      # how the first run of this job failed.
+      - uses: actions/checkout@v4
+
       - name: Dump the database
         env:
           # The DIRECT Neon URL, not the pooled one. pg_dump holds a session and
@@ -81,9 +86,27 @@ jobs:
           # would be unauditable from here. The public key below can encrypt and
           # nothing else; decrypting needs a private key that has never been
           # near GitHub. There is no shared secret to guess.
-          if grep -q 'REPLACE_ME_WITH_YOUR_AGE_PUBLIC_KEY' .github/backup-recipient.txt; then
-            echo "No recipient key set. See docs/backups.md."
-            echo "Refusing to store a dump that nothing can decrypt, or worse, one in the clear."
+          # Written to fail CLOSED. The first version asked only whether the
+          # placeholder was present, and grep on a missing file exits non-zero,
+          # so an absent recipient file sailed straight past the one check whose
+          # job was to stop exactly that. A guard that passes when its input is
+          # missing is worse than no guard, because it is trusted.
+          RECIPIENT=.github/backup-recipient.txt
+
+          if [ ! -f "$RECIPIENT" ]; then
+            echo "$RECIPIENT is missing. Is the checkout step still there?"
+            exit 1
+          fi
+
+          if grep -q 'REPLACE_ME_WITH_YOUR_AGE_PUBLIC_KEY' "$RECIPIENT"; then
+            echo "No recipient key set yet. See docs/backups.md."
+            exit 1
+          fi
+
+          # Positively confirm a key is present rather than inferring it from
+          # the absence of the placeholder.
+          if ! grep -q '^age1' "$RECIPIENT"; then
+            echo "$RECIPIENT holds no age public key."
             exit 1
           fi
 
@@ -91,7 +114,7 @@ jobs:
           sudo apt-get install -y -qq age
 
           age --encrypt \
-              --recipients-file .github/backup-recipient.txt \
+              --recipients-file "$RECIPIENT" \
               --output backup.sql.age \
               backup.sql
 
