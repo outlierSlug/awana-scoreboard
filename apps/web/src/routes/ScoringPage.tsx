@@ -212,7 +212,7 @@ export function ScoringPage() {
       <ConfirmDialog
         open={deleting !== null}
         title={`Delete ${deleting?.name ?? 'these rules'}?`}
-        confirmLabel="Delete them"
+        confirmLabel="Delete"
         destructive
         busy={remove.isPending}
         onCancel={() => {

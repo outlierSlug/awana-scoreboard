@@ -30,7 +30,18 @@ export function BoardPage() {
     return <BoardMessage title="Loading" detail="Fetching the scoreboard." />
   }
 
-  if (error || !data) {
+  // Deliberately NOT "error || !data".
+  //
+  // Once a board has loaded, a failing request is a refetch that failed, and
+  // the scores from a moment ago are still the best thing this screen can show.
+  // Tearing them down for a full page error means a twenty second wifi blip
+  // empties the TV in front of a gym full of children, which is a far worse
+  // outcome than a board that is briefly a round behind. The connection dot
+  // already says the screen is not keeping up, so the staleness is not silent.
+  //
+  // The message is kept for the case it was written for: nothing has ever
+  // loaded, so there is genuinely nothing to show.
+  if (!data) {
     return (
       <BoardMessage
         title="Scoreboard unavailable"

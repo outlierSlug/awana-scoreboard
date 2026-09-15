@@ -131,7 +131,12 @@ export function ConsolePage() {
     return <div className="h-40 animate-pulse rounded-xl bg-muted" />
   }
 
-  if (session.error || !session.data) {
+  // Only when there is nothing to fall back to. A refetch that fails while the
+  // console is already open must not replace it: the scorekeeper may be several
+  // taps into a round, and throwing the screen away to report a failed
+  // background request would lose the round along with it. A stale console
+  // still records; the next write is what surfaces a genuine problem.
+  if (!session.data) {
     return (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
         <p className="font-medium">That session could not be loaded.</p>

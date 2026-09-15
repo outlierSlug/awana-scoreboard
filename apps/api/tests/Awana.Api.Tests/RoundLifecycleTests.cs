@@ -508,4 +508,56 @@ public class RoundLifecycleTests(ApiFixture fixture)
             livePosition < futurePosition,
             "The running session should sort above one dated later that has not started.");
     }
+
+    // ------------------------------------------------------------------- 10
+
+    [Fact]
+    public async Task A_viewer_can_read_the_board_but_cannot_change_the_score()
+    {
+        // The role exists so that somebody can be given an account without
+        // being given the scoreboard. Nothing in the console offers a viewer
+        // these buttons, but the console is not the gate: the account is.
+        var client = Client;
+        var (divisionId, gameId, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2028, 7, 7));
+        await StartAsync(client, session.Id);
+
+        // Every write a night is made of, refused.
+        var writes = new (string What, HttpRequestMessage Request)[]
+        {
+            ("record a round", Viewer(HttpMethod.Post, $"/api/sessions/{session.Id}/rounds",
+                CleanRound(gameId, teams))),
+
+            ("add an adjustment", Viewer(HttpMethod.Post, $"/api/sessions/{session.Id}/adjustments",
+                new CreateAdjustmentRequest(teams[0], 5m, "Helping tidy up"))),
+
+            ("finish the session", Viewer(HttpMethod.Post, $"/api/sessions/{session.Id}/finish")),
+        };
+
+        foreach (var (what, request) in writes)
+        {
+            using (request)
+            {
+                Assert.Equal(
+                    HttpStatusCode.Forbidden,
+                    (await client.SendAsync(request)).StatusCode);
+            }
+        }
+
+        // And the thing a viewer IS for still works: the public board needs no
+        // account at all, so it cannot have been broken by refusing the writes.
+        var board = await client.GetAsync($"/api/public/sessions/{session.Slug}/scoreboard");
+        Assert.Equal(HttpStatusCode.OK, board.StatusCode);
+    }
+
+    private static HttpRequestMessage Viewer(HttpMethod method, string url, object? body = null)
+    {
+        var request = new HttpRequestMessage(method, url);
+        request.Headers.Add(TestAuth.RoleHeader, nameof(UserRole.Viewer));
+
+        if (body is not null) request.Content = JsonContent.Create(body, body.GetType());
+
+        return request;
+    }
 }
