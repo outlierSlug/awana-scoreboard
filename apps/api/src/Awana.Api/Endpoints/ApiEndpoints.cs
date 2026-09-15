@@ -49,8 +49,26 @@ public static class ApiEndpoints
                     extensions: new Dictionary<string, object?> { ["code"] = "google_not_configured" });
             }
 
+            // prompt=select_account, every time, for two reasons.
+            //
+            // Without it Google silently reuses whichever account the browser
+            // signed in with last. Someone whose address is not on the
+            // allowlist is then stuck: they are refused, they press the button
+            // again, and Google hands back the same rejected account with no
+            // chooser and no way to reach one. The only escape is signing out
+            // of Google entirely, which nobody guesses.
+            //
+            // The second reason outlasts that one. A round records who entered
+            // it, and the console runs on a shared laptop, so an account
+            // carried over silently from the last volunteer puts the wrong name
+            // on tonight's rounds. Being asked which account is the point, not
+            // a cost.
             return Results.Challenge(
-                new AuthenticationProperties { RedirectUri = ReturnTargets.AfterSignIn(context, returnUrl) },
+                new GoogleChallengeProperties
+                {
+                    RedirectUri = ReturnTargets.AfterSignIn(context, returnUrl),
+                    Prompt = "select_account",
+                },
                 [GoogleDefaults.AuthenticationScheme]);
         });
 

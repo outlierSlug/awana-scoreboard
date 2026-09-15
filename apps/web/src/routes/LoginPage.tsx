@@ -52,7 +52,7 @@ export function LoginPage({ denied = false }: { denied?: boolean }) {
 
             <CardDescription className="leading-relaxed">
               {denied
-                ? 'Ask an admin to add your email address, then sign in again. Only verified accounts can access the scorekeeper console.'
+                ? 'Sign in again to pick a different account, or ask an admin to add this address. Only verified accounts can access the scorekeeper console.'
                 : isSignedIn
                   ? 'You are already signed in.'
                   : 'Sign-in with a verified account to access the scorekeeper console.'}
@@ -66,7 +66,11 @@ export function LoginPage({ denied = false }: { denied?: boolean }) {
               <Button asChild size="lg" variant="outline" className="h-11 w-full">
                 <a href={api.loginUrl(returnUrl)}>
                   <GoogleMark />
-                  Continue with Google
+                  {/* Named for what it is for here. "Continue with Google" on
+                      the page that just refused a Google account reads as the
+                      same door that was locked a second ago, which is why
+                      somebody turned away presses it and expects nothing. */}
+                  {denied ? 'Try a different account' : 'Continue with Google'}
                 </a>
               </Button>
             )}
