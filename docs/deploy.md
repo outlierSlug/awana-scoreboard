@@ -45,9 +45,18 @@ while you do Neon.
 3. Append `;Max Auto Prepare=0` to the **pooled** string.
 
    Neon fronts Postgres with PgBouncer in transaction mode, which is incompatible with
-   Npgsql's automatic prepared statements. Without this the app works, then fails
-   intermittently under load with errors that name a prepared statement you never
-   wrote. It is the single most confusing failure in this stack.
+   Npgsql's automatic prepared statements: the symptom is intermittent failures under
+   load naming a prepared statement nobody wrote.
+
+   Being precise about what this setting is for, because it is easy to over-trust:
+   Npgsql already defaults `Max Auto Prepare` to 0, so an unset connection string is
+   safe today. Writing it explicitly is a guard against somebody turning it on later
+   without knowing what is downstream, not a fix for a live problem. Verified against
+   Npgsql 9.0.4: with the parameter absent, `MaxAutoPrepare` reads 0.
+
+   Spell it exactly. Npgsql rejects an unknown keyword outright rather than ignoring
+   it, so a typo here is not a subtle misconfiguration; the API refuses to start with
+   `Couldn't set max auto prepare`.
 4. Leave the direct string alone. Migrations use it, and DDL must not go through a
    pooler.
 
