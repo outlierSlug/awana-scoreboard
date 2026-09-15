@@ -4,6 +4,7 @@ using Awana.Api.Realtime;
 using Awana.Api.Services;
 using Awana.Data;
 using Awana.Scoring;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +71,40 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Render terminates TLS at its proxy and forwards plain HTTP to the container,
+// so without this the app believes every request arrived over http.
+//
+// That is not a cosmetic difference. The Google handler builds its redirect_uri
+// from the current request's scheme and host, so it would send Google
+// "http://api.awanascoreboard.org/signin-google" while the console has the
+// https form registered, and sign-in fails with redirect_uri_mismatch and
+// nothing in the API's own logs to explain it. The same mistake stops
+// SameAsRequest from marking the session cookie Secure.
+//
+// Placed first: everything after it, CORS and authentication included, reads
+// the scheme this corrects.
+if (!string.IsNullOrWhiteSpace(port))
+{
+    var forwarded = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
+    };
+
+    // The defaults only trust loopback, and Render's proxy is neither loopback
+    // nor an address that can be known in advance. Clearing both is what makes
+    // the headers above take effect at all.
+    //
+    // Safe here only because this branch requires $PORT, which is set by the
+    // platform: the app is reachable solely through that proxy, so nothing else
+    // is in a position to forge these headers. It must NOT become unconditional,
+    // since a directly reachable server would then let any caller claim any
+    // scheme and host it liked.
+    forwarded.KnownIPNetworks.Clear();
+    forwarded.KnownProxies.Clear();
+
+    app.UseForwardedHeaders(forwarded);
+}
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();

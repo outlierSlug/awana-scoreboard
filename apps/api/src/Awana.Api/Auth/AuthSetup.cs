@@ -58,7 +58,19 @@ public static class AuthSetup
             // in production, and localhost on two ports locally, where the port
             // is not part of the site.
             options.Cookie.SameSite = SameSiteMode.Lax;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+            // Always, not SameAsRequest.
+            //
+            // SameAsRequest decides from the scheme the app believes it is
+            // serving, and behind a TLS terminating proxy that is http unless
+            // the forwarded headers are being read. So the one situation where
+            // the flag matters most is exactly the situation where
+            // SameAsRequest quietly drops it, and the result is a session
+            // cookie travelling unprotected with nothing to show for it.
+            //
+            // This costs nothing locally: browsers treat http://localhost as a
+            // secure context, so a Secure cookie is still set and still sent.
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 
             options.ExpireTimeSpan = TimeSpan.FromDays(14);
             options.SlidingExpiration = true;
