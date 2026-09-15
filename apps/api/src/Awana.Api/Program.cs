@@ -1,5 +1,6 @@
 using Awana.Api.Auth;
 using Awana.Api.Endpoints;
+using Awana.Api.Observability;
 using Awana.Api.Realtime;
 using Awana.Api.Services;
 using Awana.Data;
@@ -7,6 +8,10 @@ using Awana.Scoring;
 using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Before anything else registers, so a failure during startup is reported in
+// the same shape as everything that follows it.
+builder.Logging.AddAwanaLogging(builder.Environment);
 
 // Database, migrations and reference-data seeding. Registration lives in
 // Awana.Data so the EF and Npgsql packages stay behind that boundary.
@@ -105,6 +110,11 @@ if (!string.IsNullOrWhiteSpace(port))
 
     app.UseForwardedHeaders(forwarded);
 }
+
+// Outside the exception handler on purpose, so a request that blew up is still
+// logged with the status the client actually received rather than disappearing
+// at the point it threw.
+app.UseRequestLogging();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
