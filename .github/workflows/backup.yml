@@ -1,0 +1,101 @@
+name: Backup database
+
+# A copy of the season off Neon, taken after the night that produced it.
+#
+# Neon's own point-in-time restore covers the accident you notice within its
+# retention window. This covers the rest: a bad migration found weeks later, an
+# account problem, or simply wanting last October back. The two are not
+# substitutes.
+
+on:
+  schedule:
+    # Saturdays at 11:00 UTC, which is 03:00 or 04:00 Pacific depending on the
+    # season. After Friday night games, before anyone is awake to be bothered
+    # by it.
+    - cron: '0 11 * * 6'
+
+  # So a backup can be taken by hand before anything risky, like a migration.
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Dump the database
+        env:
+          # The DIRECT Neon URL, not the pooled one. pg_dump holds a session and
+          # sets session state, which PgBouncer in transaction mode does not
+          # carry between statements.
+          #
+          # This is the postgres:// URI from Neon's dashboard, NOT the .NET
+          # connection string the API uses. pg_dump speaks URIs.
+          DATABASE_URL: ${{ secrets.NEON_DIRECT_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "NEON_DIRECT_URL is not set. Add it under repository secrets."
+            exit 1
+          fi
+
+          # pg_dump comes from a pinned image rather than the runner, because
+          # the runner's client version drifts and a client older than the
+          # server refuses to dump at all. Matching the Postgres 17 that Neon
+          # runs removes that whole class of surprise.
+          docker run --rm -e DATABASE_URL postgres:17 \
+            pg_dump "$DATABASE_URL" \
+              --no-owner \
+              --no-privileges \
+              --format=plain \
+            > backup.sql
+
+      - name: Check it is actually a backup
+        run: |
+          set -euo pipefail
+
+          # The failure that matters is not a job that goes red. It is a job
+          # that goes green for a year and leaves a pile of empty files, which
+          # is only discovered on the day they are needed.
+          test -s backup.sql
+
+          for table in rounds round_results sessions teams games scoring_profiles; do
+            grep -q "CREATE TABLE public.${table}" backup.sql || {
+              echo "Dump is missing the ${table} table. Refusing to store it."
+              exit 1
+            }
+          done
+
+          echo "Dump looks complete: $(wc -c < backup.sql) bytes."
+
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${BACKUP_PASSPHRASE}" ]; then
+            echo "BACKUP_PASSPHRASE is not set. Refusing to store an unencrypted dump."
+            exit 1
+          fi
+
+          # THIS REPOSITORY IS PUBLIC, and so are its artifacts: anyone can
+          # download them. The dump carries volunteer names and email addresses,
+          # so it does not leave this job in the clear.
+          gpg --batch --yes --symmetric \
+              --cipher-algo AES256 \
+              --passphrase "$BACKUP_PASSPHRASE" \
+              --output backup.sql.gpg \
+              backup.sql
+
+          rm backup.sql
+
+      - name: Store
+        uses: actions/upload-artifact@v4
+        with:
+          name: awana-backup-${{ github.run_id }}
+          path: backup.sql.gpg
+          # Long enough to cover a whole Awana season, which is the unit anyone
+          # would actually want back.
+          retention-days: 90
+          if-no-files-found: error
