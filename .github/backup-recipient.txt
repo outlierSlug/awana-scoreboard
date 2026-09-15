@@ -16,4 +16,4 @@
 #
 # Lines starting with # are ignored by age.
 
-REPLACE_ME_WITH_YOUR_AGE_PUBLIC_KEY
+age15zquj3lay39pydz4hphqrsyulhl3swdpwem5ynpqwsp69hdduvwqj600n5
