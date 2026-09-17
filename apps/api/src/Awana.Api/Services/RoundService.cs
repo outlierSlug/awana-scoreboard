@@ -161,6 +161,7 @@ public class RoundService(
             round.RoundNumber,
             request.GameId,
             request.Multiplier,
+            Results = Summarize(outcome),
         });
 
         try
@@ -250,6 +251,21 @@ public class RoundService(
 
         var outcome = engine.Score(input, config);
 
+        // What the round said before this edit, read before anything below
+        // replaces it. "Edited round 3" alone tells whoever reads the log that
+        // something changed and nothing about what, which is the one thing
+        // they opened the log to find out.
+        var before = new
+        {
+            round.GameId,
+            Multiplier = round.PointMultiplier,
+            Results = await db.RoundResults
+                .AsNoTracking()
+                .Where(r => r.RoundId == round.Id)
+                .Select(r => new AuditResult(r.TeamId, r.Place, r.IsDisqualified, r.PointsAwarded + r.BonusPoints))
+                .ToListAsync(ct),
+        };
+
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         // Clear the old results in one statement, outside the change tracker.
@@ -269,7 +285,12 @@ public class RoundService(
         db.RoundResults.AddRange(AttachResults(round, outcome, request.Entries));
 
         session.Version++;
-        AddAudit(session, userId, "round.edited", nameof(Round), round.Id, new { round.RoundNumber });
+        AddAudit(session, userId, "round.edited", nameof(Round), round.Id, new
+        {
+            round.RoundNumber,
+            Before = before,
+            After = new { request.GameId, request.Multiplier, Results = Summarize(outcome) },
+        });
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
@@ -322,7 +343,7 @@ public class RoundService(
 
         round.Session.Version++;
         AddAudit(round.Session, userId, "round.voided", nameof(Round), round.Id,
-            new { round.RoundNumber, Reason = reason });
+            new { round.RoundNumber, round.GameId, Reason = reason });
 
         await db.SaveChangesAsync(ct);
 
@@ -398,6 +419,19 @@ public class RoundService(
     /// a child appearing on a tracked parent's collection as an existing row to
     /// update rather than a new one to insert.
     /// </returns>
+    /// <summary>
+    /// A round's result as the audit log keeps it: who placed where, and what
+    /// it was worth, bonus included. Enough to rebuild the finish order a year
+    /// later without the rows it came from, which a deleted session takes with
+    /// it.
+    /// </summary>
+    private sealed record AuditResult(Guid TeamId, int? Place, bool IsDisqualified, decimal Points);
+
+    private static List<AuditResult> Summarize(ScoringOutcome outcome) =>
+        outcome.Awards
+            .Select(a => new AuditResult(a.TeamId, a.Place, a.IsDisqualified, a.Points))
+            .ToList();
+
     private static List<RoundResult> AttachResults(
         Round round, ScoringOutcome outcome, IReadOnlyList<RoundEntryRequest> entries)
     {
@@ -482,6 +516,6 @@ public class RoundService(
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
-            Data = JsonSerializer.SerializeToDocument(data),
+            Data = AuditData.ForSession(session.Id, data),
         });
 }

@@ -5,12 +5,14 @@ import {
   CirclePlus,
   Dot,
   Gamepad2,
+  Settings2,
   Trophy,
   UserCog,
   type LucideIcon,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { describeActivity, type ActivityCategory } from '@/lib/activity'
+import { describeActivity, groupActivity, type ActivityCategory, type ActivityGroup } from '@/lib/activity'
 import { api } from '@/lib/apiClient'
 import { formatDate } from '@/lib/format'
 import { queryKeys } from '@/lib/queryClient'
@@ -27,11 +29,18 @@ const ICONS: Record<ActivityCategory, LucideIcon> = {
 }
 
 /**
- * Everything anyone has changed, newest first.
+ * How many of a group's entries show before it folds. A night is thirty or more
+ * lines of rounds, and the question is usually about the last few.
+ */
+const FOLDED = 6
+
+/**
+ * Everything anyone has changed, a night at a time.
  *
  * The question this answers is usually specific and asked days later: why
- * does Blue have 145, who cleared round 6, when did Sam become an admin. So
- * every line says who, when, and on which night, without opening anything.
+ * does Blue have 145, who cleared round 6, when did Sam become an admin. So a
+ * night's entries sit together under that night, and each line says who and
+ * when without having to open anything.
  */
 export function ActivityList() {
   const activity = useInfiniteQuery<ActivityPage>({
@@ -69,16 +78,8 @@ export function ActivityList() {
 
   return (
     <div className="flex flex-col gap-6">
-      {groupByDay(entries).map(({ day, items }) => (
-        <section key={day}>
-          <h2 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{day}</h2>
-
-          <ul className="flex flex-col divide-y rounded-xl bg-card ring-1 ring-foreground/10">
-            {items.map((entry) => (
-              <ActivityRow key={entry.id} entry={entry} names={names} />
-            ))}
-          </ul>
-        </section>
+      {groupActivity(entries).map((group) => (
+        <Group key={group.key} group={group} names={names} />
       ))}
 
       {activity.hasNextPage && (
@@ -95,11 +96,76 @@ export function ActivityList() {
   )
 }
 
-function ActivityRow({ entry, names }: { entry: ActivityEntry; names: Record<string, string> }) {
+function Group({ group, names }: { group: ActivityGroup; names: Record<string, string> }) {
+  const [open, setOpen] = useState(false)
+
+  const hidden = group.entries.length - FOLDED
+  const shown = open || hidden <= 0 ? group.entries : group.entries.slice(0, FOLDED)
+
+  return (
+    <section>
+      <header className="mb-2 flex items-baseline justify-between gap-3">
+        <div className="min-w-0">
+          {group.session ? (
+            <h2 className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-semibold">{group.session.divisionName}</span>
+              <span className="text-sm text-muted-foreground">{formatDate(group.session.date)}</span>
+            </h2>
+          ) : (
+            <h2 className="flex flex-wrap items-center gap-x-2">
+              <Settings2 className="size-4 text-muted-foreground" />
+              <span className="font-semibold">Games, scoring and people</span>
+              <span className="text-sm text-muted-foreground">{group.day}</span>
+            </h2>
+          )}
+        </div>
+
+        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+          {group.entries.length} {group.entries.length === 1 ? 'change' : 'changes'}
+        </span>
+      </header>
+
+      <ul className="flex flex-col divide-y rounded-xl bg-card ring-1 ring-foreground/10">
+        {shown.map((entry) => (
+          <Row key={entry.id} entry={entry} names={names} withDay={group.spansDays} />
+        ))}
+
+        {hidden > 0 && (
+          <li>
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              className="w-full px-4 py-2.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {open ? 'Show fewer' : `Show ${hidden} more`}
+            </button>
+          </li>
+        )}
+      </ul>
+    </section>
+  )
+}
+
+function Row({
+  entry,
+  names,
+  withDay,
+}: {
+  entry: ActivityEntry
+  names: Record<string, string>
+  withDay: boolean
+}) {
   const line = describeActivity(entry, names)
   const Icon = ICONS[line.category]
 
-  const time = new Date(entry.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  // A night set up on Tuesday and played on Friday needs the day on each line;
+  // one played in an evening does not, and the time alone reads faster.
+  const when = new Date(entry.at).toLocaleString(
+    undefined,
+    withDay
+      ? { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
+      : { hour: 'numeric', minute: '2-digit' },
+  )
 
   return (
     <li className="flex gap-3 px-4 py-3">
@@ -108,46 +174,20 @@ function ActivityRow({ entry, names }: { entry: ActivityEntry; names: Record<str
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium break-words">{line.text}</p>
+        <p className="text-sm font-medium wrap-break-word">{line.text}</p>
 
-        {line.detail && <p className="mt-0.5 text-sm text-muted-foreground break-words">&ldquo;{line.detail}&rdquo;</p>}
+        {line.details.map((detail) => (
+          <p key={detail} className="mt-0.5 text-sm wrap-break-word text-muted-foreground">
+            {detail}
+          </p>
+        ))}
 
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {/* The system did it on its own when there is no actor: seeding, for
-              instance. Saying so beats a blank that reads like a missing name. */}
-          {entry.actorName ?? 'System'} · {time}
-          {entry.session && (
-            <>
-              {' '}
-              · {entry.session.divisionName}, {formatDate(entry.session.date)}
-            </>
-          )}
+        <p className="mt-1 text-xs text-muted-foreground">
+          {/* No actor means the system did it on its own, seeding for instance.
+              Saying so beats a blank that reads like a missing name. */}
+          {entry.actorName ?? 'System'} · {when}
         </p>
       </div>
     </li>
   )
-}
-
-/**
- * Headed by the local day the change was made, which is what somebody means by
- * "on Friday". The session a round belongs to is a separate thing, and each
- * line names it.
- */
-function groupByDay(entries: ActivityEntry[]): { day: string; items: ActivityEntry[] }[] {
-  const groups: { day: string; items: ActivityEntry[] }[] = []
-
-  for (const entry of entries) {
-    const day = new Date(entry.at).toLocaleDateString(undefined, {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    })
-
-    const last = groups.at(-1)
-    if (last?.day === day) last.items.push(entry)
-    else groups.push({ day, items: [entry] })
-  }
-
-  return groups
 }

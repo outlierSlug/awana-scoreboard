@@ -35,6 +35,7 @@ export function ScoringRulesDialog({
   open,
   onClose,
   profile,
+  readOnly = false,
   busy,
   error,
   onSave,
@@ -43,25 +44,31 @@ export function ScoringRulesDialog({
   onClose: () => void
   /** Null creates a set. Anything else edits that one. */
   profile: ScoringProfile | null
+  /** Shown to somebody who may look but not change anything. */
+  readOnly?: boolean
   busy: boolean
   error: unknown
   onSave: (body: SaveScoringProfileRequest) => void
 }) {
   return (
     <Modal open={open} onClose={onClose} locked={busy} className="w-[min(40rem,calc(100%-2rem))]">
-      {open && <Form profile={profile} busy={busy} error={error} onClose={onClose} onSave={onSave} />}
+      {open && (
+        <Form profile={profile} readOnly={readOnly} busy={busy} error={error} onClose={onClose} onSave={onSave} />
+      )}
     </Modal>
   )
 }
 
 function Form({
   profile,
+  readOnly,
   busy,
   error,
   onClose,
   onSave,
 }: {
   profile: ScoringProfile | null
+  readOnly: boolean
   busy: boolean
   error: unknown
   onClose: () => void
@@ -71,8 +78,10 @@ function Form({
   const [config, setConfig] = useState<ScoringConfig>(profile?.config ?? DEFAULT_SCORING_CONFIG)
 
   // Seeded sets are shown, not edited. The name is a claim about a standard,
-  // and the way to change anything is to duplicate it.
-  const locked = profile?.isSeeded === true
+  // and the way to change anything is to duplicate it. Anyone who is not an
+  // admin sees every set this way.
+  const seeded = profile?.isSeeded === true
+  const locked = readOnly || seeded
 
   // Asked of the DOM rather than threaded down: whatever the trigger sits in is
   // the right place to portal a menu to. A menu sent to document.body lands
@@ -99,8 +108,9 @@ function Form({
 
         {locked && (
           <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            The standard table, shown as it is. Duplicate it from the list to make a set you can
-            change.
+            {readOnly
+              ? 'Shown as it is. Only an admin can change scoring rules.'
+              : 'The standard table, shown as it is. Duplicate it from the list to make a set you can change.'}
           </p>
         )}
       </div>

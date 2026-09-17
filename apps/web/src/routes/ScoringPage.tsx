@@ -23,9 +23,9 @@ export function ScoringPage() {
   const queryClient = useQueryClient()
   const { can } = useMe()
 
-  // A games leader can see which rules exist, because choosing between them
-  // happens on the new session form. Deciding what the rules ARE is an admin's.
-  const canRead = can(UserRole.GamesLeader)
+  // A scorekeeper can open the rules, because they are the one asked why a tie
+  // scored the way it did. Deciding what the rules ARE is an admin's.
+  const canRead = can(UserRole.Scorekeeper)
   const canEdit = can(UserRole.Admin)
 
   const [showing, setShowing] = useState<ScoringProfile | 'new' | null>(null)
@@ -181,10 +181,14 @@ export function ScoringPage() {
 
       <ScoringHelpDialog open={helping} onClose={() => setHelping(false)} />
 
-      {canEdit && (
+      {/* For everyone who can read, not only admins. It used to render for
+          admins alone, so View on this page set state for a dialog that did
+          not exist, and pressing it simply did nothing. */}
+      {canRead && (
         <ScoringRulesDialog
           open={showing !== null}
           profile={editing}
+          readOnly={!canEdit}
           busy={save.isPending}
           error={save.error}
           onClose={() => {

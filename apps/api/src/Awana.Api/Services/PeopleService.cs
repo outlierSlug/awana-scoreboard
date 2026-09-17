@@ -199,7 +199,7 @@ public class PeopleService(AwanaDbContext db, IOptions<SeedOptions> seed)
         if (hasMore) rows.RemoveAt(rows.Count - 1);
 
         var sessionOf = await SessionsForAsync(
-            rows.Select(r => (r.EntityType, r.EntityId)).ToList(), ct);
+            rows.Select(r => (r.EntityType, r.EntityId, r.Data)).ToList(), ct);
 
         var names = await NamesForAsync(rows.Select(r => r.Data), ct);
 
@@ -211,7 +211,7 @@ public class PeopleService(AwanaDbContext db, IOptions<SeedOptions> seed)
                 r.EntityId,
                 r.ActorUserId,
                 r.ActorName,
-                sessionOf(r.EntityType, r.EntityId),
+                sessionOf(r.EntityType, r.EntityId, r.Data),
                 r.Data?.RootElement.Clone()))
             .ToList();
 
@@ -266,23 +266,28 @@ public class PeopleService(AwanaDbContext db, IOptions<SeedOptions> seed)
     // ------------------------------------------------------------- activity
 
     /// <summary>
-    /// Works out which session each entry happened in, so a round being cleared
-    /// reads as happening on a particular night.
+    /// Works out which session each entry happened in, so the activity view can
+    /// say which night it was and group the night's entries together.
     /// </summary>
     /// <remarks>
-    /// Entries point at different things: a session, a round, or an adjustment.
-    /// One wrinkle is load bearing. "adjustment.added" records the session's id
-    /// rather than the adjustment's, while "adjustment.voided" records the
-    /// adjustment's, so an adjustment id is tried as either.
+    /// Newer entries carry the session's id in their data, stamped by
+    /// <see cref="AuditData.ForSession"/>, which is the reliable answer. Older
+    /// ones do not, and are worked out from what they point at: a session, a
+    /// round, or an adjustment. One wrinkle there is load bearing:
+    /// "adjustment.added" recorded the session's id rather than the
+    /// adjustment's, while "adjustment.voided" recorded the adjustment's, so an
+    /// adjustment id is tried as either.
     ///
-    /// A session that has since been deleted simply resolves to nothing; its
-    /// own "session.deleted" entry carries its date in the data.
+    /// A deleted session is recovered from its own "session.deleted" entry,
+    /// which is the last place its division and date are written down. That is
+    /// what lets "Cleared round 2" still say which night, after the night
+    /// itself is gone.
     /// </remarks>
-    private async Task<Func<string, Guid, ActivitySessionDto?>> SessionsForAsync(
-        IReadOnlyList<(string Type, Guid Id)> entities, CancellationToken ct)
+    private async Task<Func<string, Guid, JsonDocument?, ActivitySessionDto?>> SessionsForAsync(
+        IReadOnlyList<(string Type, Guid Id, JsonDocument? Data)> entries, CancellationToken ct)
     {
-        var roundIds = entities.Where(e => e.Type == nameof(Round)).Select(e => e.Id).Distinct().ToList();
-        var adjustmentIds = entities.Where(e => e.Type == nameof(PointAdjustment)).Select(e => e.Id).Distinct().ToList();
+        var roundIds = entries.Where(e => e.Type == nameof(Round)).Select(e => e.Id).Distinct().ToList();
+        var adjustmentIds = entries.Where(e => e.Type == nameof(PointAdjustment)).Select(e => e.Id).Distinct().ToList();
 
         var roundSession = roundIds.Count == 0
             ? new Dictionary<Guid, Guid>()
@@ -296,11 +301,28 @@ public class PeopleService(AwanaDbContext db, IOptions<SeedOptions> seed)
                 .Where(a => adjustmentIds.Contains(a.Id))
                 .ToDictionaryAsync(a => a.Id, a => a.SessionId, ct);
 
-        var sessionIds = entities
-            .Where(e => e.Type == nameof(Session) || e.Type == nameof(PointAdjustment))
-            .Select(e => e.Id)
-            .Concat(roundSession.Values)
-            .Concat(adjustmentSession.Values)
+        Guid? SessionIdOf(string type, Guid id, JsonDocument? data)
+        {
+            if (data is not null &&
+                data.RootElement.ValueKind == JsonValueKind.Object &&
+                data.RootElement.TryGetProperty("SessionId", out var stamped) &&
+                stamped.TryGetGuid(out var sessionId))
+            {
+                return sessionId;
+            }
+
+            return type switch
+            {
+                nameof(Session) => id,
+                nameof(Round) => roundSession.TryGetValue(id, out var s) ? s : null,
+                nameof(PointAdjustment) => adjustmentSession.TryGetValue(id, out var s) ? s : id,
+                _ => null,
+            };
+        }
+
+        var sessionIds = entries
+            .Select(e => SessionIdOf(e.Type, e.Id, e.Data))
+            .OfType<Guid>()
             .Distinct()
             .ToList();
 
@@ -311,18 +333,70 @@ public class PeopleService(AwanaDbContext db, IOptions<SeedOptions> seed)
                 .Select(s => new ActivitySessionDto(s.Id, s.Division.Name, s.Date))
                 .ToDictionaryAsync(s => s.Id, ct);
 
-        return (type, id) =>
-        {
-            Guid? sessionId = type switch
-            {
-                nameof(Session) => id,
-                nameof(Round) => roundSession.TryGetValue(id, out var s) ? s : null,
-                nameof(PointAdjustment) => adjustmentSession.TryGetValue(id, out var s) ? s : id,
-                _ => null,
-            };
+        var missing = sessionIds.Where(id => !sessions.ContainsKey(id)).ToList();
 
-            return sessionId is { } key && sessions.TryGetValue(key, out var session) ? session : null;
-        };
+        if (missing.Count > 0)
+        {
+            // Across the whole log rather than this page: a session's deletion
+            // is newer than everything that happened in it, so it is usually on
+            // an earlier page than the rounds that need it.
+            var deletions = await db.AuditLogs.AsNoTracking()
+                .Where(a => a.Action == "session.deleted" && missing.Contains(a.EntityId))
+                .Select(a => new { a.EntityId, a.Data })
+                .ToListAsync(ct);
+
+            var divisionsBySlug = await db.Divisions.AsNoTracking()
+                .ToDictionaryAsync(d => d.Slug, d => d.Name, ct);
+
+            foreach (var deletion in deletions)
+            {
+                if (Recovered(deletion.EntityId, deletion.Data, divisionsBySlug) is { } session)
+                {
+                    sessions[deletion.EntityId] = session;
+                }
+            }
+        }
+
+        return (type, id, data) =>
+            SessionIdOf(type, id, data) is { } key && sessions.TryGetValue(key, out var session) ? session : null;
+    }
+
+    /// <summary>
+    /// A deleted session's division and date, from the entry that recorded its
+    /// deletion.
+    /// </summary>
+    /// <remarks>
+    /// Older deletions kept only the public slug, so the division is recovered
+    /// from its front half: "tnt-2026-09-14" belongs to the division whose slug
+    /// is "tnt".
+    /// </remarks>
+    private static ActivitySessionDto? Recovered(
+        Guid sessionId, JsonDocument? data, IReadOnlyDictionary<string, string> divisionsBySlug)
+    {
+        if (data is null || data.RootElement.ValueKind != JsonValueKind.Object) return null;
+
+        var root = data.RootElement;
+
+        if (!root.TryGetProperty("Date", out var dateValue) ||
+            !DateOnly.TryParse(dateValue.GetString(), out var date))
+        {
+            return null;
+        }
+
+        var division = root.TryGetProperty("DivisionName", out var named) && named.ValueKind == JsonValueKind.String
+            ? named.GetString()
+            : null;
+
+        if (division is null &&
+            root.TryGetProperty("PublicSlug", out var slugValue) &&
+            slugValue.GetString() is { } slug)
+        {
+            var suffix = $"-{date:yyyy-MM-dd}";
+            var at = slug.IndexOf(suffix, StringComparison.Ordinal);
+            if (at > 0) divisionsBySlug.TryGetValue(slug[..at], out division);
+        }
+
+        return division is null ? null : new ActivitySessionDto(sessionId, division, date);
     }
 
     /// <summary>

@@ -309,6 +309,66 @@ public class PeopleTests(ApiFixture fixture)
         }
     }
 
+    // ------------------------------------------------------------------ 10
+
+    [Fact]
+    public async Task A_deleted_nights_rounds_still_say_which_night_and_what_changed()
+    {
+        var client = Client;
+        var (divisionId, gameId, teams) = await fixture.FixtureIdsAsync();
+        var date = new DateOnly(2029, 4, 6);
+
+        var created = await client.PostAsJsonAsync("/api/sessions", new CreateSessionRequest(divisionId, date));
+        created.EnsureSuccessStatusCode();
+        var session = (await created.Content.ReadFromJsonAsync<SessionDetailDto>())!;
+        (await client.PostAsync($"/api/sessions/{session.Id}/start", null)).EnsureSuccessStatusCode();
+
+        List<RoundEntryRequest> Order(IEnumerable<Guid> ids) =>
+            ids.Select((id, i) => new RoundEntryRequest(id, i + 1, false, 0m, null)).ToList();
+
+        var recorded = await client.PostAsJsonAsync(
+            $"/api/sessions/{session.Id}/rounds", new CreateRoundRequest(Guid.NewGuid(), gameId, 1m, Order(teams)));
+        recorded.EnsureSuccessStatusCode();
+        var round = (await recorded.Content.ReadFromJsonAsync<RoundRecordedDto>())!;
+
+        // Finish order reversed, so the edit has something to show.
+        (await client.PutAsJsonAsync(
+            $"/api/rounds/{round.RoundId}",
+            new UpdateRoundRequest(gameId, 1m, Order(Enumerable.Reverse(teams))))).EnsureSuccessStatusCode();
+
+        (await client.PostAsJsonAsync(
+            $"/api/rounds/{round.RoundId}/void", new VoidRoundRequest("Wrong game"))).EnsureSuccessStatusCode();
+
+        // With nothing standing, the whole night can go, and the rounds with it.
+        (await client.DeleteAsync($"/api/sessions/{session.Id}")).EnsureSuccessStatusCode();
+
+        var page = await client.GetFromJsonAsync<ActivityPageDto>("/api/activity?limit=20");
+        var night = page!.Entries.Where(e => e.Session?.Id == session.Id).ToList();
+
+        // Every step of the night, including the rounds whose rows are gone,
+        // still knows which night it was.
+        foreach (var action in new[] { "session.started", "round.recorded", "round.edited", "round.voided", "session.deleted" })
+        {
+            var found = night.SingleOrDefault(e => e.Action == action);
+            Assert.True(found is not null, $"{action} was not placed in its session");
+            Assert.Equal("T&T", found.Session!.DivisionName);
+            Assert.Equal(date, found.Session.Date);
+        }
+
+        // And says what happened, not only that something did.
+        var recordedEntry = night.Single(e => e.Action == "round.recorded");
+        Assert.Equal(teams.Count, recordedEntry.Data!.Value.GetProperty("Results").GetArrayLength());
+
+        var edit = night.Single(e => e.Action == "round.edited").Data!.Value;
+        var firstBefore = edit.GetProperty("Before").GetProperty("Results").EnumerateArray()
+            .Single(r => r.GetProperty("Place").GetInt32() == 1).GetProperty("TeamId").GetGuid();
+        var firstAfter = edit.GetProperty("After").GetProperty("Results").EnumerateArray()
+            .Single(r => r.GetProperty("Place").GetInt32() == 1).GetProperty("TeamId").GetGuid();
+
+        Assert.Equal(teams.First(), firstBefore);
+        Assert.Equal(teams.Last(), firstAfter);
+    }
+
     // ------------------------------------------------------------------- 9
 
     [Fact]

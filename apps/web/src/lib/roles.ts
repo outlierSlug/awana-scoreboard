@@ -45,6 +45,7 @@ export const CAPABILITIES: { label: string; minimum: UserRole }[] = [
   { label: 'Sign in and see sessions and games', minimum: UserRole.Viewer },
   { label: 'Record, edit and clear rounds', minimum: UserRole.Scorekeeper },
   { label: 'Headcounts and point adjustments', minimum: UserRole.Scorekeeper },
+  { label: 'View scoring rules', minimum: UserRole.Scorekeeper },
   { label: 'Create, start and finish sessions', minimum: UserRole.GamesLeader },
   { label: 'Add, edit, reorder and retire games', minimum: UserRole.GamesLeader },
   { label: 'Create and edit scoring rules', minimum: UserRole.Admin },

@@ -357,12 +357,24 @@ public class ScoringProfileTests(ApiFixture fixture)
     // ------------------------------------------------------------------ 14
 
     [Fact]
-    public async Task A_scorekeeper_cannot_see_the_rules_list_at_all()
+    public async Task A_scorekeeper_can_read_the_rules_but_a_viewer_cannot()
     {
-        var client = fixture.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuth.RoleHeader, nameof(UserRole.Scorekeeper));
+        // The scorekeeper is the one asked why a tie scored the way it did, so
+        // they can open the rules and look, and preview what a table does. They
+        // still cannot change any of it.
+        var scorekeeper = fixture.CreateClient();
+        scorekeeper.DefaultRequestHeaders.Add(TestAuth.RoleHeader, nameof(UserRole.Scorekeeper));
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Profiles)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await scorekeeper.GetAsync(Profiles)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await scorekeeper.PostAsJsonAsync($"{Profiles}/preview", Config(40m, 30m))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            (await scorekeeper.PostAsJsonAsync(Profiles, new SaveScoringProfileRequest("Not Allowed", Config(40m)))).StatusCode);
+
+        var viewer = fixture.CreateClient();
+        viewer.DefaultRequestHeaders.Add(TestAuth.RoleHeader, nameof(UserRole.Viewer));
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await viewer.GetAsync(Profiles)).StatusCode);
     }
 
     // ------------------------------------------------------------------ 20

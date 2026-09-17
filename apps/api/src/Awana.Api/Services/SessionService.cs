@@ -269,10 +269,12 @@ public class SessionService(
             }
         }
 
+        var previous = session.ScoringProfileId;
         session.ScoringProfileId = scoringProfileId;
 
         AddAudit(session, userId, "session.scoring_set", nameof(Session), session.Id, new
         {
+            From = previous,
             ScoringProfileId = scoringProfileId,
         });
 
@@ -333,7 +335,15 @@ public class SessionService(
             db.SessionTeams.Add(new SessionTeam { SessionId = session.Id, TeamId = team.Id });
         }
 
-        AddAudit(session, userId, "session.started");
+        // The rules are frozen here, so this is the entry that can answer "what
+        // was that night scored under" long after the set itself was edited.
+        AddAudit(session, userId, "session.started", nameof(Session), session.Id, new
+        {
+            session.Status,
+            session.Version,
+            Scoring = profile?.Name,
+            session.ScoringConfig.PlacePoints,
+        });
         await db.SaveChangesAsync(ct);
 
         return await BroadcastStatusAsync(session.Id, ct);
@@ -430,8 +440,16 @@ public class SessionService(
 
         // Audited before the delete, because the row it points at is about to
         // stop existing and the log is the only place it will be mentioned.
+        var divisionName = await db.Divisions
+            .Where(d => d.Id == session.DivisionId)
+            .Select(d => d.Name)
+            .FirstOrDefaultAsync(ct);
+
         AddAudit(session, userId, "session.deleted", nameof(Session), session.Id, new
         {
+            // Without this the entry could only say "a session on the 14th",
+            // and there are usually two of those.
+            DivisionName = divisionName,
             session.PublicSlug,
             session.Date,
             session.Status,
@@ -550,7 +568,7 @@ public class SessionService(
 
         adjustment.Session.Version++;
         AddAudit(adjustment.Session, userId, "adjustment.voided",
-            nameof(PointAdjustment), adjustment.Id, new { adjustment.TeamId, adjustment.Points });
+            nameof(PointAdjustment), adjustment.Id, new { adjustment.TeamId, adjustment.Points, adjustment.Reason });
 
         await db.SaveChangesAsync(ct);
 
@@ -583,18 +601,25 @@ public class SessionService(
         }
 
         var byTeam = session.SessionTeams.ToDictionary(st => st.TeamId);
+        var changes = new List<object>();
 
         foreach (var entry in request.Teams)
         {
-            if (byTeam.TryGetValue(entry.TeamId, out var sessionTeam))
+            if (byTeam.TryGetValue(entry.TeamId, out var sessionTeam) && sessionTeam.Headcount != entry.Headcount)
             {
+                changes.Add(new { entry.TeamId, From = sessionTeam.Headcount, To = entry.Headcount });
                 sessionTeam.Headcount = entry.Headcount;
             }
         }
 
+        // A save that changes nothing records nothing, so every headcount line
+        // in the log is a number that actually moved.
+        if (changes.Count == 0) return await GetAsync(sessionId, ct);
+
         AddAudit(session, userId, "attendance.updated", nameof(Session), session.Id, new
         {
             Recorded = request.Teams.Count(t => t.Headcount is not null),
+            Teams = changes,
         });
 
         await db.SaveChangesAsync(ct);
@@ -644,7 +669,7 @@ public class SessionService(
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
-            Data = JsonSerializer.SerializeToDocument(data),
+            Data = AuditData.ForSession(session.Id, data),
         });
 
     private void AddAudit(Session session, Guid? userId, string action) =>
@@ -655,6 +680,6 @@ public class SessionService(
             Action = action,
             EntityType = nameof(Session),
             EntityId = session.Id,
-            Data = JsonSerializer.SerializeToDocument(new { session.Status, session.Version }),
+            Data = AuditData.ForSession(session.Id, new { session.Status, session.Version }),
         });
 }

@@ -296,10 +296,12 @@ public static class ApiEndpoints
     /// The named sets of scoring rules, and the editor behind them.
     /// </summary>
     /// <remarks>
-    /// Reading is open to a games leader, because choosing which rules a
-    /// session runs under happens on the new session form. Writing is an
-    /// admin's, because these decide what every future night is worth and one
-    /// wrong digit here is worth more than any single mistyped round.
+    /// Reading is open to a scorekeeper. A games leader needs the list to choose
+    /// which rules a session runs under, and a scorekeeper entering the rounds
+    /// is the person most often asked why a tie scored the way it did, so they
+    /// should be able to open the rules and see. Writing is an admin's, because
+    /// these decide what every future night is worth and one wrong digit here
+    /// is worth more than any single mistyped round.
     ///
     /// Editing is safe for history regardless: a session freezes its own copy
     /// of the rules when it starts, so nothing here can reach a night already
@@ -309,7 +311,7 @@ public static class ApiEndpoints
     {
         var group = app.MapGroup("/api/catalog/scoring-profiles")
             .WithTags("Scoring rules")
-            .RequireAuthorization(AuthPolicies.GamesLeader);
+            .RequireAuthorization(AuthPolicies.Scorekeeper);
 
         group.MapGet("/", async (ClaimsPrincipal user, ScoringProfileService profiles, CancellationToken ct) =>
             user.Church() is { } church
