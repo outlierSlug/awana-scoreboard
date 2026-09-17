@@ -164,6 +164,53 @@ export function atLeast(role: string | null | undefined, minimum: UserRole): boo
   return ROLE_RANK[role as UserRole] >= ROLE_RANK[minimum]
 }
 
+/** An account, as the People page shows it. Admins only. */
+export interface Person {
+  id: string
+  email: string
+  /** The address itself until they first sign in and Google supplies a name. */
+  displayName: string
+  role: UserRole
+  isActive: boolean
+  /** False for an address that was added but never used. */
+  hasSignedIn: boolean
+  lastLoginAt: string | null
+  createdAt: string
+  /** Set by Seed__AdminEmails. The page does not edit these. */
+  isConfigAdmin: boolean
+}
+
+export interface ActivitySession {
+  id: string
+  divisionName: string
+  date: string
+}
+
+/**
+ * One line of the audit log.
+ *
+ * `data` is whatever the action recorded, with PascalCase keys as it was written
+ * on the server. Ids inside it are named in the page's `names`.
+ */
+export interface ActivityEntry {
+  id: string
+  at: string
+  action: string
+  entityType: string
+  entityId: string
+  actorId: string | null
+  actorName: string | null
+  session: ActivitySession | null
+  data: Record<string, unknown> | null
+}
+
+export interface ActivityPage {
+  entries: ActivityEntry[]
+  names: Record<string, string>
+  /** Pass back as `before` for the next page. Null at the end. */
+  nextBefore: string | null
+}
+
 /** Who the caller is, or that they are nobody. Anonymous is a normal answer. */
 export interface Me {
   isSignedIn: boolean

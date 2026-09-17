@@ -118,9 +118,15 @@ for that exact slug, hardcoded, because v1 ships configured for one church. Sett
 to something truer leaves the API answering correctly and the home page listing nothing,
 with no error. Change both or neither.
 
-An address in none of the three allowlists cannot sign in at all: the API refuses it
-rather than quietly creating a viewer. Put your own address in `Seed__AdminEmails`
-before the first deploy or you will be locked out of your own instance.
+An address with no account cannot sign in at all: the API refuses it rather than
+quietly creating a viewer. Put your own address in `Seed__AdminEmails` before the first
+deploy or you will be locked out of your own instance.
+
+After that, manage people on the **People** page rather than here. The two volunteer
+lists only create accounts that do not exist yet, so editing them later changes nothing
+for anyone who already has one. `Seed__AdminEmails` is different on purpose: those
+addresses are put back to active admins on every restart, which is the way in again if
+every admin in the app is ever demoted or deactivated.
 
 Once the first deploy is green, add `api.awanascoreboard.org` as a custom domain. Render
 will show the CNAME target to use in the next step.

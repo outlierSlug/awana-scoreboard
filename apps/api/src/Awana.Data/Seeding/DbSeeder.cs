@@ -207,10 +207,25 @@ public class DbSeeder(AwanaDbContext db, ILogger<DbSeeder> logger)
         await db.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Creates the accounts configuration names, and restores configured admins.
+    /// </summary>
+    /// <remarks>
+    /// Roles belong to the People page now, so this no longer rewrites them.
+    /// It used to set every listed account's role on every boot, which was
+    /// right while configuration was the only way to manage anyone and wrong
+    /// the moment there was another: a promotion made in the app would have
+    /// been quietly reverted by the next deploy.
+    ///
+    /// The admin list is the exception, on purpose. Its addresses are put back
+    /// to active admins on every boot, so that demoting or deactivating every
+    /// admin in the app is recoverable by restarting the server rather than by
+    /// editing production with SQL.
+    /// </remarks>
     private async Task SeedUsersAsync(Church church, SeedOptions options, CancellationToken ct)
     {
-        // Highest role last, so someone listed twice ends up with the greater
-        // of the two rather than depending on list order.
+        // Highest role last, so someone listed twice is created with the
+        // greater of the two rather than depending on list order.
         var allowlists = new (UserRole Role, string Raw)[]
         {
             (UserRole.Scorekeeper, options.ScorekeeperEmails),
@@ -222,7 +237,7 @@ public class DbSeeder(AwanaDbContext db, ILogger<DbSeeder> logger)
 
         foreach (var (role, raw) in allowlists)
         {
-            foreach (var email in ParseEmails(raw))
+            foreach (var email in SeedOptions.ParseEmails(raw))
             {
                 if (!intended.TryGetValue(email, out var already) || role > already)
                 {
@@ -231,30 +246,37 @@ public class DbSeeder(AwanaDbContext db, ILogger<DbSeeder> logger)
             }
         }
 
-        if (intended.Count == 0)
-        {
-            logger.LogWarning(
-                "No seeded users. Nobody can sign in until Seed__AdminEmails is configured.");
-            return;
-        }
-
         var existing = await db.Users
             .Where(u => u.ChurchId == church.Id)
             .ToDictionaryAsync(u => u.Email, ct);
+
+        if (intended.Count == 0 && existing.Count == 0)
+        {
+            logger.LogWarning(
+                "No users. Nobody can sign in until Seed__AdminEmails is configured.");
+            return;
+        }
 
         foreach (var (email, role) in intended)
         {
             if (existing.TryGetValue(email, out var user))
             {
-                // Roles are managed from configuration in v1, so a change there
-                // is intended to take effect. The display name is not touched:
-                // Google supplies it at sign-in and that is better than a guess.
-                if (user.Role != role)
+                if (role == UserRole.Admin && (user.Role != UserRole.Admin || !user.IsActive))
                 {
-                    logger.LogInformation("Role for {Email} changed to {Role}", email, role);
-                    user.Role = role;
+                    // Warning rather than information: this undoes something an
+                    // admin did on purpose, and whoever did it should be able to
+                    // find out why it came back.
+                    logger.LogWarning(
+                        "Restored {Email} to an active admin because it is listed in Seed__AdminEmails",
+                        email);
+
+                    user.Role = UserRole.Admin;
+                    user.IsActive = true;
                 }
 
+                // Everyone else keeps whatever the People page gave them. The
+                // display name is not touched either: Google supplies it at
+                // sign-in and that is better than a guess.
                 continue;
             }
 
@@ -271,11 +293,4 @@ public class DbSeeder(AwanaDbContext db, ILogger<DbSeeder> logger)
 
         await db.SaveChangesAsync(ct);
     }
-
-    /// <summary>Splits, trims, lowercases and drops blanks and duplicates.</summary>
-    private static IEnumerable<string> ParseEmails(string raw) =>
-        raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(e => e.ToLowerInvariant())
-            .Where(e => e.Contains('@'))
-            .Distinct(StringComparer.Ordinal);
 }

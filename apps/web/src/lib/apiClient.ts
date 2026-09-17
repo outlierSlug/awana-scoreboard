@@ -1,5 +1,6 @@
 import { config } from '@/config'
 import type {
+  ActivityPage,
   CreateAdjustmentRequest,
   CreateRoundRequest,
   Division,
@@ -16,9 +17,11 @@ import type {
   Scoreboard,
   SessionDetail,
   Me,
+  Person,
   SessionSummary,
   UpdateAttendanceRequest,
   UpdateRoundRequest,
+  UserRole,
 } from './types'
 
 /**
@@ -240,4 +243,29 @@ export const api = {
 
   voidRound: (roundId: string, reason: string) =>
     request<Scoreboard>('POST', `/api/rounds/${roundId}/void`, { reason }),
+
+  // People. Admins only; the API refuses everyone else.
+  people: (signal?: AbortSignal) => request<Person[]>('GET', '/api/people', undefined, signal),
+
+  /** An address and a role. Their name arrives from Google when they first sign in. */
+  addPerson: (email: string, role: UserRole) =>
+    request<Person>('POST', '/api/people', { email, role }),
+
+  /** Applies on their next request, not their next sign-in. */
+  setPersonRole: (id: string, role: UserRole) =>
+    request<Person>('PUT', `/api/people/${id}/role`, { role }),
+
+  /** Signs them out everywhere and refuses their next sign-in. Nothing they recorded changes. */
+  deactivatePerson: (id: string) => request<Person>('POST', `/api/people/${id}/deactivate`),
+
+  reactivatePerson: (id: string) => request<Person>('POST', `/api/people/${id}/reactivate`),
+
+  /** The audit log, newest first. Pass the previous page's nextBefore to go further back. */
+  activity: (before: string | null, signal?: AbortSignal) =>
+    request<ActivityPage>(
+      'GET',
+      `/api/activity?limit=50${before ? `&before=${encodeURIComponent(before)}` : ''}`,
+      undefined,
+      signal,
+    ),
 }

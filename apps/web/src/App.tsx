@@ -7,6 +7,7 @@ import { HomePage } from '@/routes/HomePage'
 import { ScoringPage } from '@/routes/ScoringPage'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage } from '@/routes/NotFoundPage'
+import { PeoplePage } from '@/routes/PeoplePage'
 import { RequireSignIn } from '@/components/RequireSignIn'
 import { SessionsPage } from '@/routes/SessionsPage'
 
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="sessions/:id" element={<ConsolePage />} />
         <Route path="games" element={<GamesPage />} />
         <Route path="scoring" element={<ScoringPage />} />
+        <Route path="people" element={<PeoplePage />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

@@ -24,6 +24,8 @@ export const queryKeys = {
   games: () => ['games'] as const,
   gameCatalog: () => ['game-catalog'] as const,
   scoringProfiles: () => ['scoring-profiles'] as const,
+  people: () => ['people'] as const,
+  activity: () => ['activity'] as const,
 }
 
 /**

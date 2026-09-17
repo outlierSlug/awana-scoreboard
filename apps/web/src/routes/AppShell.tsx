@@ -4,7 +4,9 @@ import { AccountMenu } from '@/components/AccountMenu'
 import { ConnectionDot } from '@/components/ConnectionDot'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { useMe } from '@/lib/auth'
 import { useHub } from '@/lib/signalr/hubContext'
+import { UserRole } from '@/lib/types'
 
 /**
  * The signed-in shell.
@@ -16,6 +18,8 @@ import { useHub } from '@/lib/signalr/hubContext'
 export function AppShell() {
   const { state, lastMessageAt } = useHub()
   const location = useLocation()
+  const { can } = useMe()
+  const isAdmin = can(UserRole.Admin)
 
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
@@ -46,6 +50,11 @@ export function AppShell() {
                 who can change what, which a scorekeeper cannot learn from a
                 link that is simply not there. */}
             <ShellLink to="/app/scoring">Scoring</ShellLink>
+            {/* Admins only, unlike the two above. Those pages are worth finding
+                even when you cannot edit them, because they explain who to
+                ask. This one has nothing to show anyone else: it is a list of
+                other people's addresses. */}
+            {isAdmin && <ShellLink to="/app/people">People</ShellLink>}
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">

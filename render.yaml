@@ -72,8 +72,16 @@ services:
       - key: Authentication__Google__ClientSecret
         sync: false
 
-      # Seeded role allowlists, comma separated. Unknown emails are refused
-      # rather than auto-created.
+      # Comma separated. Unknown emails are refused rather than auto-created.
+      #
+      # People are managed on the People page now, and these lists only
+      # CREATE accounts that do not exist yet. Changing a role or removing an
+      # address here does nothing to an existing account; do that on the page.
+      #
+      # Seed__AdminEmails is the exception: every address in it is restored to
+      # an active admin on each restart. It is the way back in if every admin
+      # in the app gets demoted or deactivated, and the page will not edit
+      # these accounts because the next restart would undo it.
       - key: Seed__AdminEmails
         sync: false
       - key: Seed__GamesLeaderEmails

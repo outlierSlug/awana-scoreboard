@@ -340,3 +340,66 @@ public sealed record MeDto(
     /// </summary>
     string? Email,
     string? Role);
+
+// ---------------------------------------------------------------- people
+
+/// <summary>
+/// One account, as the People page shows it. Admins only: this is the one
+/// payload in the API that lists other people's email addresses.
+/// </summary>
+/// <param name="Role">The role's name, the same spelling <see cref="MeDto"/> uses.</param>
+/// <param name="HasSignedIn">
+/// False for an address that was added but has never been used. Worth showing,
+/// because it usually means a typo or somebody still waiting to be told.
+/// </param>
+/// <param name="IsConfigAdmin">
+/// Listed in Seed__AdminEmails. The page will not edit these, because the next
+/// restart would put them back.
+/// </param>
+public sealed record PersonDto(
+    Guid Id,
+    string Email,
+    string DisplayName,
+    string Role,
+    bool IsActive,
+    bool HasSignedIn,
+    DateTimeOffset? LastLoginAt,
+    DateTimeOffset CreatedAt,
+    bool IsConfigAdmin);
+
+public sealed record AddPersonRequest(string Email, string Role);
+
+public sealed record SetRoleRequest(string Role);
+
+/// <summary>
+/// A page of the audit log, newest first.
+/// </summary>
+/// <param name="Names">
+/// Display names for ids that appear inside entries' <c>Data</c>: games, teams
+/// and scoring rules. The log stores ids, which stay correct when something is
+/// renamed; this is what lets the page say "Baton Relay" instead of a GUID.
+/// </param>
+/// <param name="NextBefore">Pass back as <c>before</c> for the next page. Null at the end.</param>
+public sealed record ActivityPageDto(
+    IReadOnlyList<ActivityEntryDto> Entries,
+    IReadOnlyDictionary<string, string> Names,
+    DateTimeOffset? NextBefore);
+
+/// <param name="ActorName">Null for anything the system did on its own.</param>
+/// <param name="Session">The session the entry happened in, when there is one and it still exists.</param>
+/// <param name="Data">
+/// Whatever the action recorded, verbatim. Property names are PascalCase, the
+/// way they were serialized when written.
+/// </param>
+public sealed record ActivityEntryDto(
+    Guid Id,
+    DateTimeOffset At,
+    string Action,
+    string EntityType,
+    Guid EntityId,
+    Guid? ActorId,
+    string? ActorName,
+    ActivitySessionDto? Session,
+    System.Text.Json.JsonElement? Data);
+
+public sealed record ActivitySessionDto(Guid Id, string DivisionName, DateOnly Date);

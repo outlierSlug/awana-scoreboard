@@ -23,6 +23,66 @@ public static class ApiEndpoints
         MapSessions(app);
         MapRounds(app);
         MapAdjustments(app);
+        MapPeople(app);
+    }
+
+    // ----------------------------------------------------------------- people
+
+    /// <summary>
+    /// Who can sign in and what they may do, plus the record of what everyone
+    /// has done. Admins only, the whole group: it is the one place in the API
+    /// that lists other people's email addresses.
+    /// </summary>
+    private static void MapPeople(WebApplication app)
+    {
+        var people = app.MapGroup("/api/people")
+            .WithTags("People")
+            .RequireAuthorization(AuthPolicies.Admin);
+
+        people.MapGet("/", async (ClaimsPrincipal user, PeopleService service, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Results.Ok(await service.ListAsync(church, ct))
+                : Problems.NoChurch());
+
+        people.MapPost("/", async (
+            AddPersonRequest request, ClaimsPrincipal user, PeopleService service, CancellationToken ct) =>
+        {
+            if (user.Church() is not { } church) return Problems.NoChurch();
+
+            var result = await service.AddAsync(church, request, user.Id(), ct);
+            return result.Ok
+                ? Results.Created($"/api/people/{result.Value!.Id}", result.Value)
+                : Problems.From(result.Error!);
+        });
+
+        people.MapPut("/{id:guid}/role", async (
+            Guid id, SetRoleRequest request, ClaimsPrincipal user, PeopleService service, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await service.SetRoleAsync(church, id, request, user.Id(), ct))
+                : Problems.NoChurch());
+
+        // Actions rather than a flag in a payload, like retiring a game: the
+        // two are different decisions with different consequences, and each
+        // gets its own line in the audit log.
+        people.MapPost("/{id:guid}/deactivate", async (
+            Guid id, ClaimsPrincipal user, PeopleService service, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await service.SetActiveAsync(church, id, false, user.Id(), ct))
+                : Problems.NoChurch());
+
+        people.MapPost("/{id:guid}/reactivate", async (
+            Guid id, ClaimsPrincipal user, PeopleService service, CancellationToken ct) =>
+            user.Church() is { } church
+                ? Problems.Wrap(await service.SetActiveAsync(church, id, true, user.Id(), ct))
+                : Problems.NoChurch());
+
+        app.MapGet("/api/activity", async (
+                DateTimeOffset? before, int? limit, ClaimsPrincipal user, PeopleService service, CancellationToken ct) =>
+                user.Church() is { } church
+                    ? Results.Ok(await service.ActivityAsync(church, before, limit, ct))
+                    : Problems.NoChurch())
+            .WithTags("People")
+            .RequireAuthorization(AuthPolicies.Admin);
     }
 
     // ----------------------------------------------------------------- auth

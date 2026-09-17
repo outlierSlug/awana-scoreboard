@@ -3,21 +3,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useMe, useSignOut } from '@/lib/auth'
-import { UserRole, type Me } from '@/lib/types'
-
-/**
- * What each role is called out loud.
- *
- * The API sends the enum name, which is the right thing for it to send and the
- * wrong thing to put in front of a volunteer: nobody outside this repository
- * calls themselves a GamesLeader.
- */
-const ROLE_LABEL: Record<string, string> = {
-  [UserRole.Viewer]: 'Viewer',
-  [UserRole.Scorekeeper]: 'Scorekeeper',
-  [UserRole.GamesLeader]: 'Games leader',
-  [UserRole.Admin]: 'Admin',
-}
+import { roleLabel } from '@/lib/roles'
+import type { Me } from '@/lib/types'
 
 /**
  * Who is signed in, and the way out.
@@ -27,10 +14,10 @@ const ROLE_LABEL: Record<string, string> = {
  * the last person's", which a shared laptop makes a real question, so it is one
  * click away rather than gone.
  *
- * There is deliberately no profile page behind this. Roles are granted by an
- * environment variable and there is nothing else on an account to look at, so a
- * page would be a route and a heading wrapped around the same three lines this
- * panel already shows.
+ * There is deliberately no profile page behind this. Nobody edits their own
+ * account, since roles are granted by an admin on the People page, so a page
+ * of your own would be a route and a heading wrapped around the same three
+ * lines this panel already shows.
  */
 export function AccountMenu() {
   const { me } = useMe()
@@ -40,7 +27,7 @@ export function AccountMenu() {
   if (!me?.isSignedIn) return null
 
   const name = me.displayName ?? me.email ?? 'Signed in'
-  const role = me.role ? (ROLE_LABEL[me.role] ?? me.role) : null
+  const role = roleLabel(me.role)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

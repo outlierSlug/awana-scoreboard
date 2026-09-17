@@ -88,6 +88,10 @@ public static class AuthSetup
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return Task.CompletedTask;
             };
+
+            // Role changes and deactivations from the People page apply on the
+            // next request rather than whenever the person next signs in.
+            options.Events.OnValidatePrincipal = SessionRevalidation.ValidateAsync;
         });
 
         if (google.IsConfigured)
