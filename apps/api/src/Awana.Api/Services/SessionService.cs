@@ -594,6 +594,17 @@ public class SessionService(
 
         if (session is null) return ServiceResult<SessionDetailDto>.Fail(ServiceError.NotFound("Session"));
 
+        // The console already refused this and the API did not, so a finished
+        // night's numbers could still be changed by anything that called it
+        // directly. A finished session is a result; reopening is the one way
+        // back into it, and that leaves its own line in the log.
+        if (session.Status == SessionStatus.Finished)
+        {
+            return ServiceResult<SessionDetailDto>.Fail(ServiceError.Conflict(
+                "session_finished",
+                "This session is finished. Reopen it before changing headcounts."));
+        }
+
         if (request.Teams.Any(t => t.Headcount is < 0 or > 1000))
         {
             return ServiceResult<SessionDetailDto>.Fail(

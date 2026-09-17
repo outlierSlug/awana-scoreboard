@@ -216,7 +216,7 @@ public class RoundService(
         // A finished night is a result, not a draft. Changing a round inside
         // one rewrites the standings the room was shown and then sent home
         // with, so it takes the deliberate step of reopening the session first,
-        // which is an admin's call and leaves an audit entry of its own.
+        // which leaves an audit entry of its own.
         if (round.Session.Status != SessionStatus.Running)
         {
             return ServiceResult<RoundRecordedDto>.Fail(ServiceError.Conflict(
@@ -327,7 +327,7 @@ public class RoundService(
         // A finished night is a result, not a draft. Changing a round inside
         // one rewrites the standings the room was shown and then sent home
         // with, so it takes the deliberate step of reopening the session first,
-        // which is an admin's call and leaves an audit entry of its own.
+        // which leaves an audit entry of its own.
         if (round.Session.Status != SessionStatus.Running)
         {
             return ServiceResult<ScoreboardDto>.Fail(ServiceError.Conflict(

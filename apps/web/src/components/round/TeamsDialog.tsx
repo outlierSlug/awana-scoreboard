@@ -30,6 +30,7 @@ export function TeamsDialog({
   adjustments,
   canCount,
   canAdjust,
+  note,
   busy,
   onSaveHeadcount,
   onAddAdjustment,
@@ -43,6 +44,11 @@ export function TeamsDialog({
   canCount: boolean
   /** Points are decided while the games run, and not after they are over. */
   canAdjust: boolean
+  /**
+   * Why nothing here can be changed, when that is the case. Greyed out controls
+   * with no reason read as broken, and the reason is usually one button away.
+   */
+  note?: string
   busy: boolean
   onSaveHeadcount: (teamId: string, headcount: number | null) => void
   onAddAdjustment: (teamId: string, points: number, reason: string) => void
@@ -52,6 +58,8 @@ export function TeamsDialog({
     <Modal open={open} onClose={onClose} className="w-[min(30rem,calc(100%-2rem))]">
       <div className="flex flex-col gap-5 p-5">
         <h2 className="text-lg font-bold tracking-tight">Teams</h2>
+
+        {note && <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">{note}</p>}
 
         <Headcounts teams={teams} editable={canCount} onSave={onSaveHeadcount} />
 

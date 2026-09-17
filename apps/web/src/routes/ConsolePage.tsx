@@ -48,7 +48,7 @@ export function ConsolePage() {
   const { can } = useMe()
   const canScore = can(UserRole.Scorekeeper)
   const canRunSession = can(UserRole.GamesLeader)
-  const canReopen = can(UserRole.Admin)
+  const canReopen = can(UserRole.GamesLeader)
   const recede = tieArmed
     ? 'pointer-events-none opacity-40 transition-opacity duration-200'
     : 'transition-opacity duration-200'
@@ -423,6 +423,13 @@ export function ConsolePage() {
         adjustments={data.adjustments}
         canCount={data.status !== SessionStatus.Finished && canScore}
         canAdjust={data.status === SessionStatus.Running && canScore}
+        note={
+          data.status === SessionStatus.Finished
+            ? canReopen
+              ? 'This session is finished. Reopen it to change headcounts or points.'
+              : 'This session is finished. A games leader can reopen it to change headcounts or points.'
+            : undefined
+        }
         busy={teamsPending}
         onSaveHeadcount={(teamId, headcount) => saveHeadcount.mutate({ teamId, headcount })}
         onAddAdjustment={(teamId, points, reason) =>
@@ -441,7 +448,7 @@ export function ConsolePage() {
       >
         <p>
           End tonight's session and mark it as finished. No more rounds can be added, and the scoreboard
-          will be finalized. Only an admin can reopen a finished session.
+          will be finalized. A games leader can reopen it afterwards, for example to add headcounts.
         </p>
       </ConfirmDialog>
 

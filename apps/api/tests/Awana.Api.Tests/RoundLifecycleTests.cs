@@ -243,11 +243,11 @@ public class RoundLifecycleTests(ApiFixture fixture)
     // ------------------------------------------------------------------- 7
 
     [Fact]
-    public async Task Reopening_a_finished_session_is_kept_to_an_admin()
+    public async Task A_games_leader_can_reopen_a_finished_session_but_a_scorekeeper_cannot()
     {
-        // Recording rounds and rewriting a night that was already called
-        // finished are different levels of trust, and the roles are ordered so
-        // that the second implies the first rather than the other way round.
+        // The person who presses Finish is a games leader, and they are the one
+        // who notices a minute later that headcounts were never entered. A
+        // scorekeeper only fills in a session somebody else runs.
         var client = Client;
         var (divisionId, _, _) = await fixture.FixtureIdsAsync();
 
@@ -261,8 +261,34 @@ public class RoundLifecycleTests(ApiFixture fixture)
 
         Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(asScorekeeper)).StatusCode);
 
-        // And the admin the role exists for can.
-        Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/sessions/{session.Id}/reopen", null)).StatusCode);
+        using var asGamesLeader = new HttpRequestMessage(
+            HttpMethod.Post, $"/api/sessions/{session.Id}/reopen");
+        asGamesLeader.Headers.Add(TestAuth.RoleHeader, nameof(UserRole.GamesLeader));
+
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(asGamesLeader)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Headcounts_missed_before_finishing_are_added_by_reopening_not_around_it()
+    {
+        // The console refused this on a finished session and the API did not,
+        // so the one rule depended on which of the two was asked.
+        var client = Client;
+        var (divisionId, _, teams) = await fixture.FixtureIdsAsync();
+
+        var session = await CreateSessionAsync(client, divisionId, new DateOnly(2026, 11, 14));
+        await StartAsync(client, session.Id);
+        (await client.PostAsync($"/api/sessions/{session.Id}/finish", null)).EnsureSuccessStatusCode();
+
+        var counts = new UpdateAttendanceRequest([new TeamHeadcount(teams[0], 11)]);
+
+        var refused = await client.PutAsJsonAsync($"/api/sessions/{session.Id}/attendance", counts);
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+
+        (await client.PostAsync($"/api/sessions/{session.Id}/reopen", null)).EnsureSuccessStatusCode();
+
+        var saved = await client.PutAsJsonAsync($"/api/sessions/{session.Id}/attendance", counts);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
     }
 
     // ------------------------------------------------------------------- 8

@@ -30,7 +30,7 @@ export const ROLES_BY_ACCESS: UserRole[] = [
 /** One line each, for choosing between them. */
 export const ROLE_SUMMARY: Record<UserRole, string> = {
   [UserRole.Admin]: 'Everything, including managing people and the scoring rules.',
-  [UserRole.GamesLeader]: 'Runs the night: creates, starts and finishes sessions, and edits the games.',
+  [UserRole.GamesLeader]: 'Runs the night: creates, starts, finishes and reopens sessions, and edits the games.',
   [UserRole.Scorekeeper]: 'Records rounds, headcounts and point adjustments during a session.',
   [UserRole.Viewer]: 'Can sign in and look, but cannot change anything.',
 }
@@ -47,9 +47,9 @@ export const CAPABILITIES: { label: string; minimum: UserRole }[] = [
   { label: 'Headcounts and point adjustments', minimum: UserRole.Scorekeeper },
   { label: 'View scoring rules', minimum: UserRole.Scorekeeper },
   { label: 'Create, start and finish sessions', minimum: UserRole.GamesLeader },
+  { label: 'Reopen a finished session', minimum: UserRole.GamesLeader },
   { label: 'Add, edit, reorder and retire games', minimum: UserRole.GamesLeader },
   { label: 'Create and edit scoring rules', minimum: UserRole.Admin },
-  { label: 'Reopen a finished session', minimum: UserRole.Admin },
   { label: 'Delete an unused game or an empty session', minimum: UserRole.Admin },
   { label: 'Manage people and review activity', minimum: UserRole.Admin },
 ]

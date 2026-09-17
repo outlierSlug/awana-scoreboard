@@ -71,7 +71,8 @@ export function SessionsHelpDialog({ open, onClose }: { open: boolean; onClose: 
         <p>
           A session made in advance sits in setup, where heads can be counted and the scoring
           rules can still be changed, but no round can be recorded. Starting moves it to live.
-          Finishing closes it, and an admin can reopen a finished session if necessary.
+          Finishing closes it. A games leader can reopen a finished session, for instance to add
+          headcounts that were missed or if it was finished too early.
         </p>
       </Topic>
     </HelpModal>

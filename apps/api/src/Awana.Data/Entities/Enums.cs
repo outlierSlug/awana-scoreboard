@@ -12,7 +12,7 @@ public enum SessionStatus
     /// <summary>Live. Rounds accepted, scoring rules frozen onto the session.</summary>
     Running = 1,
 
-    /// <summary>Closed. A round posted now is rejected. An admin can reopen it.</summary>
+    /// <summary>Closed. A round posted now is rejected. A games leader can reopen it.</summary>
     Finished = 2,
 }
 
@@ -31,9 +31,9 @@ public enum UserRole
     /// <summary>Can record and correct rounds.</summary>
     Scorekeeper = 20,
 
-    /// <summary>Can also create sessions and manage the game catalog.</summary>
+    /// <summary>Can also run sessions, including reopening a finished one, and manage the game catalog.</summary>
     GamesLeader = 30,
 
-    /// <summary>Can also manage users, scoring profiles, and reopen a finished session.</summary>
+    /// <summary>Can also manage people and scoring rules, and delete what was never used.</summary>
     Admin = 40,
 }

@@ -427,9 +427,14 @@ public static class ApiEndpoints
 
         group.MapPost("/{id:guid}/reopen", async (Guid id, ClaimsPrincipal user, SessionService sessions, CancellationToken ct) =>
             Problems.Wrap(await sessions.ReopenAsync(id, user.Id(), ct)))
-            // Reopening rewrites a night that was called finished, so it is the
-            // one session action kept to an admin.
-            .RequireAuthorization(AuthPolicies.Admin);
+            // A games leader's, like finishing. The person who presses Finish is
+            // the one who notices a minute later that the headcounts were never
+            // entered, or that it was pressed a round early, and waiting for an
+            // admin to undo it is the kind of delay a gym does not have. The
+            // reopen is audited like everything else. Deleting a session stays
+            // an admin's, because that removes a record rather than correcting
+            // one.
+            .RequireAuthorization(AuthPolicies.GamesLeader);
 
         // Only ever a session that never happened, and only an admin's call.
         // See DeleteAsync for why this is not the way to undo a night.
