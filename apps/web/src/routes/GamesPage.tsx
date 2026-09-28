@@ -9,6 +9,7 @@ import { api, ApiError } from '@/lib/apiClient'
 import { useMe } from '@/lib/auth'
 import { queryKeys } from '@/lib/queryClient'
 import { UserRole, type GameDetail, type SaveGameRequest } from '@/lib/types'
+import { useDocumentTitle } from '@/lib/hooks/useDocumentTitle'
 
 /**
  * The club's list of what it plays.
@@ -23,6 +24,7 @@ import { UserRole, type GameDetail, type SaveGameRequest } from '@/lib/types'
  * one and everything about it, reading and editing alike, is in the dialog.
  */
 export function GamesPage() {
+  useDocumentTitle('Games')
   const queryClient = useQueryClient()
   const { can } = useMe()
 

@@ -4,9 +4,10 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { useFlip } from '@/lib/hooks/useFlip'
 import { useScoreboard } from '@/lib/hooks/useScoreboard'
 import { useWakeLock } from '@/lib/hooks/useWakeLock'
-import { formatDate, formatPoints } from '@/lib/format'
+import { formatDate, formatPoints, formatShortDate } from '@/lib/format'
 import { SessionStatus, type LastRound, type Standing } from '@/lib/types'
 import './board.css'
+import { useDocumentTitle } from '@/lib/hooks/useDocumentTitle'
 
 /**
  * The public scoreboard.
@@ -25,6 +26,8 @@ export function BoardPage() {
 
   // The screen must not sleep while a board is on the wall.
   useWakeLock(true)
+
+  useDocumentTitle(data ? `${data.divisionName}, ${formatShortDate(data.date)}` : 'Scoreboard')
 
   if (isPending) {
     return <BoardMessage title="Loading" detail="Fetching the scoreboard." />

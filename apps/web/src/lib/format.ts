@@ -37,3 +37,19 @@ export function formatPoints(points: number): string {
   // Three, matching the numeric(9,3) the points are stored in.
   return points.toLocaleString(undefined, { maximumFractionDigits: 3 })
 }
+
+/**
+ * A session date short enough for a browser tab: "Oct 2".
+ *
+ * In UTC for the same reason as formatDate: the API sends a calendar day, and
+ * reading it as local midnight moves Friday to Thursday west of the church.
+ */
+export function formatShortDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}

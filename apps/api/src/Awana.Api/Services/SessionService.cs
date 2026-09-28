@@ -61,9 +61,9 @@ public class SessionService(
     /// Nights that are over, newest first.
     /// </summary>
     /// <remarks>
-    /// Capped rather than paged. Somebody looking for last week's result wants
-    /// the last few weeks, and a club accumulates one of these a week, so a
-    /// page control here would be scaffolding for a list nobody scrolls.
+    /// Capped rather than paged. A season is about 24 nights of two divisions,
+    /// so the ceiling holds four seasons, which is more than anybody browsing
+    /// past results scrolls through, and each row is a handful of columns.
     /// </remarks>
     public async Task<IReadOnlyList<SessionSummaryDto>> ListFinishedAsync(
         string churchSlug, int limit = 12, CancellationToken ct = default) =>
@@ -73,7 +73,7 @@ public class SessionService(
             .Where(s => s.Church.Slug == churchSlug && s.Status == SessionStatus.Finished)
             .OrderByDescending(s => s.Date)
             .ThenBy(s => s.Division.SortOrder)
-            .Take(Math.Clamp(limit, 1, 50))
+            .Take(Math.Clamp(limit, 1, 200))
             .Select(s => new SessionSummaryDto(
                 s.Id,
                 s.PublicSlug,

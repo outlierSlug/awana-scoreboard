@@ -1,79 +1,56 @@
 import { Moon, Sun } from 'lucide-react'
-import { useTheme, type ResolvedTheme } from '@/lib/themeContext'
-
-const OPTIONS: { value: ResolvedTheme; label: string; Icon: typeof Sun }[] = [
-  { value: 'light', label: 'Light', Icon: Sun },
-  { value: 'dark', label: 'Dark', Icon: Moon },
-]
+import { useTheme } from '@/lib/themeContext'
 
 /**
- * Pick one of two, rather than a single button that flips.
+ * One button that flips between light and dark.
  *
- * A segmented control shows the current state without the reader having to work
- * out whether the icon means "you are here" or "go here", which is the standing
- * ambiguity of a one-button toggle.
+ * The icon is where a tap takes you: a moon in light mode, a sun in dark. That
+ * is the convention most sites use, and the tooltip and accessible name say it
+ * in words for anyone who reads the icon the other way.
  *
- * The theme still starts on whatever the device is set to. Highlighting is
- * driven by the RESOLVED theme, so before anyone touches it the control already
- * shows which way the system went. "System" is not offered as a third option:
- * it is the default and nobody picks it deliberately.
+ * The theme still starts on whatever the device is set to, because the icon is
+ * driven by the RESOLVED theme. "System" is not something to click back to: it
+ * is the default, and nobody picks it deliberately.
  *
- * On a phone it collapses to one button showing where it would take you, and
- * the ambiguity is worth accepting there: the header has three destinations and
- * a connection state to fit, and a control costing twice the width to be
- * marginally clearer is the wrong trade at 390px.
+ * This replaced a two-segment control on wide screens. It showed the current
+ * state more explicitly, but at twice the width for a setting touched once, and
+ * phones already used this button, so the two layouts disagreed.
  */
 export function ThemeToggle({ className }: { className?: string }) {
   const { resolved, setTheme } = useTheme()
 
-  const other = resolved === 'dark' ? OPTIONS[0] : OPTIONS[1]
+  const next = resolved === 'dark' ? 'light' : 'dark'
+  const label = `Switch to ${next} mode`
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setTheme(other.value)}
-        aria-label={`Switch to ${other.label.toLowerCase()} theme`}
-        title={`Switch to ${other.label.toLowerCase()}`}
-        className={['flex size-8 shrink-0 items-center justify-center rounded-lg sm:hidden', className]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        <other.Icon className="size-4" />
-      </button>
-
-      <div
-      className={['hidden shrink-0 gap-0.5 rounded-lg p-0.5 sm:inline-flex', className]
+    <button
+      type="button"
+      onClick={() => setTheme(next)}
+      aria-label={label}
+      title={label}
+      className={[
+        'relative flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        className,
+      ]
         .filter(Boolean)
         .join(' ')}
-      style={{ background: 'color-mix(in oklch, currentColor, transparent 92%)' }}
-      role="group"
-      aria-label="Color theme"
     >
-      {OPTIONS.map(({ value, label, Icon }) => {
-        const active = resolved === value
-
-        return (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setTheme(value)}
-            aria-label={label}
-            aria-pressed={active}
-            title={label}
-            className="flex size-7 items-center justify-center rounded-md transition-opacity"
-            style={{
-              background: active
-                ? 'color-mix(in oklch, currentColor, transparent 82%)'
-                : 'transparent',
-              opacity: active ? 1 : 0.55,
-            }}
-          >
-            <Icon className="size-3.5" />
-          </button>
-        )
-      })}
-      </div>
-    </>
+      {/* Both drawn, one visible, so the swap can turn rather than blink. The
+          motion is skipped for anyone who has asked for less of it. */}
+      <Sun
+        aria-hidden
+        className={[
+          'absolute size-4 transition-all duration-300 motion-reduce:transition-none',
+          resolved === 'dark' ? 'scale-100 rotate-0 opacity-100' : 'scale-50 -rotate-90 opacity-0',
+        ].join(' ')}
+      />
+      <Moon
+        aria-hidden
+        className={[
+          'absolute size-4 transition-all duration-300 motion-reduce:transition-none',
+          resolved === 'dark' ? 'scale-50 rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100',
+        ].join(' ')}
+      />
+    </button>
   )
 }

@@ -25,7 +25,8 @@ import {
   type Scoreboard,
   type SessionDetail,
 } from '@/lib/types'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatShortDate } from '@/lib/format'
+import { useDocumentTitle } from '@/lib/hooks/useDocumentTitle'
 
 export function ConsolePage() {
   const { id } = useParams<{ id: string }>()
@@ -74,6 +75,10 @@ export function ConsolePage() {
     join(id)
     return () => leave(id)
   }, [id, join, leave])
+
+  useDocumentTitle(
+    session.data ? `${session.data.divisionName}, ${formatShortDate(session.data.date)}` : 'Session',
+  )
 
   // Once the night is over the scorekeeper wants the result, not a list of who
   // played. Read from the same endpoint the wall reads, so the totals here and

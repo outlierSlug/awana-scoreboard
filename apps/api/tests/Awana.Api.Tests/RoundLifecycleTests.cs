@@ -577,6 +577,39 @@ public class RoundLifecycleTests(ApiFixture fixture)
         Assert.Equal(HttpStatusCode.OK, board.StatusCode);
     }
 
+    [Fact]
+    public async Task The_results_archive_reaches_past_the_home_pages_dozen()
+    {
+        // The home page shows the last couple of nights and keeps the rest in an
+        // archive. A season is about 48 finished sessions, so the archive has
+        // to be able to ask for more than the dozen the list used to stop at.
+        var client = Client;
+        var (divisionId, _, _) = await fixture.FixtureIdsAsync();
+
+        for (var week = 0; week < 14; week++)
+        {
+            var session = await CreateSessionAsync(client, divisionId, new DateOnly(2031, 1, 3).AddDays(7 * week));
+            await StartAsync(client, session.Id);
+            (await client.PostAsync($"/api/sessions/{session.Id}/finish", null)).EnsureSuccessStatusCode();
+        }
+
+        var byDefault = await client.GetFromJsonAsync<List<SessionSummaryDto>>(
+            "/api/public/finished?church=test-church");
+        var archive = await client.GetFromJsonAsync<List<SessionSummaryDto>>(
+            "/api/public/finished?church=test-church&limit=200");
+        var absurd = await client.GetFromJsonAsync<List<SessionSummaryDto>>(
+            "/api/public/finished?church=test-church&limit=100000");
+
+        Assert.Equal(12, byDefault!.Count);
+        Assert.True(archive!.Count >= 14, $"archive returned {archive.Count}");
+
+        // Clamped, not honored: an arbitrary number cannot make this a bulk export.
+        Assert.True(absurd!.Count <= 200);
+
+        // Newest first, so the home page's "recent" is simply the head of it.
+        Assert.Equal(archive.OrderByDescending(s => s.Date).Select(s => s.Date), archive.Select(s => s.Date));
+    }
+
     private static HttpRequestMessage Viewer(HttpMethod method, string url, object? body = null)
     {
         var request = new HttpRequestMessage(method, url);

@@ -9,6 +9,7 @@ import { api, ApiError } from '@/lib/apiClient'
 import { useMe } from '@/lib/auth'
 import { queryKeys } from '@/lib/queryClient'
 import { UserRole, type SaveScoringProfileRequest, type ScoringProfile } from '@/lib/types'
+import { useDocumentTitle } from '@/lib/hooks/useDocumentTitle'
 
 /**
  * The named sets of scoring rules a session can run under.
@@ -20,6 +21,7 @@ import { UserRole, type SaveScoringProfileRequest, type ScoringProfile } from '@
  * some session was started from.
  */
 export function ScoringPage() {
+  useDocumentTitle('Scoring')
   const queryClient = useQueryClient()
   const { can } = useMe()
 

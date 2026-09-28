@@ -170,8 +170,10 @@ public static class ApiEndpoints
         group.MapGet("/live", async (string church, SessionService sessions, CancellationToken ct) =>
             Results.Ok(await sessions.ListLiveAsync(church, ct)));
 
-        group.MapGet("/finished", async (string church, SessionService sessions, CancellationToken ct) =>
-            Results.Ok(await sessions.ListFinishedAsync(church, ct: ct)));
+        // The home page shows the last few; its archive asks for a season's
+        // worth. Clamped in the service either way.
+        group.MapGet("/finished", async (string church, int? limit, SessionService sessions, CancellationToken ct) =>
+            Results.Ok(await sessions.ListFinishedAsync(church, limit ?? 12, ct)));
 
         group.MapGet("/sessions/{slug}/scoreboard",
             async (string slug, ScoreboardService scoreboard, CancellationToken ct) =>

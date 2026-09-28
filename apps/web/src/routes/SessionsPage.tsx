@@ -26,10 +26,12 @@ import {
   type SessionSummary,
 } from '@/lib/types'
 import { formatDate } from '@/lib/format'
+import { useDocumentTitle } from '@/lib/hooks/useDocumentTitle'
 
 export function SessionsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  useDocumentTitle('Sessions')
   const [creating, setCreating] = useState(false)
   const [helping, setHelping] = useState(false)
 

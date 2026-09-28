@@ -14,6 +14,7 @@ import { api, ApiError } from '@/lib/apiClient'
 import { queryKeys } from '@/lib/queryClient'
 import { ROLE_LABEL, ROLE_SUMMARY, ROLES_BY_ACCESS } from '@/lib/roles'
 import { UserRole, type Person } from '@/lib/types'
+import { useDocumentTitle } from '@/lib/hooks/useDocumentTitle'
 
 const ROLE_ICON: Record<UserRole, LucideIcon> = {
   [UserRole.Admin]: ShieldCheck,
@@ -44,6 +45,7 @@ export function PeoplePage() {
 
   const [search, setSearch] = useSearchParams()
   const view = search.get('view') === 'activity' ? 'activity' : 'people'
+  useDocumentTitle(view === 'activity' ? 'Activity' : 'People')
 
   const [adding, setAdding] = useState(false)
   const [helping, setHelping] = useState(false)

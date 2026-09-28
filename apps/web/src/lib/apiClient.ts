@@ -112,10 +112,11 @@ export const api = {
   liveSessions: (church: string, signal?: AbortSignal) =>
     request<SessionSummary[]>('GET', `/api/public/live?church=${encodeURIComponent(church)}`, undefined, signal),
 
-  finishedSessions: (church: string, signal?: AbortSignal) =>
+  /** Newest first. The API clamps `limit` to 200, a few seasons' worth. */
+  finishedSessions: (church: string, limit: number, signal?: AbortSignal) =>
     request<SessionSummary[]>(
       'GET',
-      `/api/public/finished?church=${encodeURIComponent(church)}`,
+      `/api/public/finished?church=${encodeURIComponent(church)}&limit=${limit}`,
       undefined,
       signal,
     ),

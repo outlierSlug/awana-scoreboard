@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card'
 import { useMe } from '@/lib/auth'
 import { api } from '@/lib/apiClient'
+import { useDocumentTitle } from '@/lib/hooks/useDocumentTitle'
 
 /**
  * The sign-in page, and the page that says no.
@@ -20,6 +21,7 @@ import { api } from '@/lib/apiClient'
  * rather than by anything the app decides.
  */
 export function LoginPage({ denied = false }: { denied?: boolean }) {
+  useDocumentTitle(denied ? 'Not verified' : 'Sign in')
   const location = useLocation()
   const { isSignedIn } = useMe()
 
