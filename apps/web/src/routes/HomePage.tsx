@@ -121,15 +121,14 @@ export function HomePage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
-        <section>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Live scores</h1>
-          <p className="mt-2 max-w-prose text-muted-foreground">
-            Follow games night as it happens. Standings update the moment each round is scored.
-          </p>
-        </section>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
+        {/* No page heading above this on purpose. The header already says what
+            the site is, and a hero restating it pushed the one thing anybody
+            came for, tonight's board, further down a phone screen. The page
+            still has an h1 for screen readers, just not a visible one. */}
+        <h1 className="sr-only">Awana Scoreboard</h1>
 
-        <section className="mt-10" aria-labelledby="live-heading">
+        <section aria-labelledby="live-heading">
           <SectionHeading id="live-heading" Icon={Radio}>
             Live now
           </SectionHeading>
